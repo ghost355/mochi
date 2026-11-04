@@ -27,10 +27,14 @@ sheet: preview
 mirror_test: mirror_test.c $(SRC)/eyes.c
 	$(CC) $(CFLAGS) $(INCS) mirror_test.c $(SRC)/eyes.c -o mirror_test -lm
 
-check: mirror_test
+banner_test: banner_test.c $(SRC)/eyes.c $(SRC)/display/font5x7.c
+	$(CC) $(CFLAGS) $(INCS) -I$(SRC)/display banner_test.c $(SRC)/eyes.c $(SRC)/display/font5x7.c -o banner_test -lm
+
+check: mirror_test banner_test
 	./mirror_test
+	./banner_test
 
 clean:
-	rm -f preview preview.ppm preview.png mirror_test
+	rm -f preview preview.ppm preview.png mirror_test banner_test
 
 .PHONY: sheet check clean

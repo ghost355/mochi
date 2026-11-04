@@ -42,6 +42,7 @@
 // Round style: two big rings with a star pupil that travels inside them.
 #define STAR_EYE_D   44
 #define ROUND_EYE_CY 36
+#define EYES_TOP_ROW 7     // rows 0..6 are the text banner's
 #define STAR_R       5
 #define ASTERISK_R   4
 #define SCRIBBLE_R       6
@@ -533,21 +534,25 @@ static void draw_eye_round(int cx, int cy, int eye, float open)
         if (py < -max_y)  py = -max_y;
     }
 
+    // A closing eye does not keep a pupil: without this the black disc sits
+    // inside the last sliver of sclera and the blink ends in two white wings.
+    bool pupil_visible = (t - mood_t) < 0.55f;
+
     switch (s_cfg.pupil) {
     case PUPIL_ASTERISK:
-        draw_asterisk(cx + px, cy + py, base_r, !solid);
+        if (pupil_visible) draw_asterisk(cx + px, cy + py, base_r, !solid);
         break;
     case PUPIL_SCRIBBLE:
-        draw_scribble(cx + px, cy + py, eye, 100, !solid);
+        if (pupil_visible) draw_scribble(cx + px, cy + py, eye, 100, !solid);
         break;
     case PUPIL_DOT:
-        draw_dot(cx + px, cy + py, base_r, !solid);
+        if (pupil_visible) draw_dot(cx + px, cy + py, base_r, !solid);
         break;
     case PUPIL_BLOB:
-        draw_blob(cx + px, cy + py, eye, 100, !solid);
+        if (pupil_visible) draw_blob(cx + px, cy + py, eye, 100, !solid);
         break;
     default:
-        draw_star(cx + px, cy + py, base_r, !solid);
+        if (pupil_visible) draw_star(cx + px, cy + py, base_r, !solid);
         break;
     }
 
@@ -863,12 +868,16 @@ eyes_rect_t eyes_draw(void)
     // brow from the previous mood is still on the panel, underneath it.
     int brow_h = 0;
     if (round && s_cfg.brow_len > 0)
-        brow_h = (s_cfg.brow_lift > 0 ? s_cfg.brow_lift : 0) + 3;
+        brow_h = (s_cfg.brow_lift > 0 ? s_cfg.brow_lift : 0) + 1;
 
     int x0 = cx_l - w / 2;
     int x1 = cx_r + w / 2;
     int y0 = cy - h / 2 - brow_h;
     int y1 = cy + h / 2;
+
+    // Rows 0..6 belong to the text banner. The eye rect drifted up to row 5 on
+    // the surprised face (brows 6 px up) and wiped the bottom of the letters.
+    if (y0 < EYES_TOP_ROW) y0 = EYES_TOP_ROW;
 
     // Clear the previous frame's area first: the eyes move and shrink, so the
     // old pixels must go.
