@@ -6,12 +6,13 @@ frame assets — the face is drawn procedurally and only the pixels that changed
 are pushed over I2C.
 
 <p align="center">
-  <img src="docs/demo.gif" width="400" alt="mochi blinking">
+  <img src="docs/demo.gif" width="380" alt="mochi blinking, then squinting">
 </p>
 
-Two capsule eyes, blink every 2-6 s, saccades, five moods, a yawn when it wakes
-up, and a passive-piezo voice — on a breadboard, with an SH1106 OLED and a
-TTP223 touch pad.
+Two eyes, blink every 2-6 s, saccades, six moods, and a passive-piezo voice —
+on a breadboard, with an SH1106 OLED and a TTP223 touch pad. The clip above is
+handheld footage, stabilised by tracking the module in frame and cancelling the
+hand movement.
 
 ## Hardware
 
