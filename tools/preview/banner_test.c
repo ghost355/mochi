@@ -42,7 +42,16 @@ int main(void){
             int before = banner_pixels();
 
             eyes_update(t);
-            eyes_draw();
+            eyes_rect_t r = eyes_draw();
+
+            // The eye rect must start on the page boundary: a rect that starts
+            // inside page 0 makes the driver send the whole page, dragging any
+            // stray eye ink above the face onto the panel.
+            if (r.w > 0 && r.y < 8) {
+                printf("face %u frame %d: eye rect starts at row %d, inside the banner page\n",
+                       f, drift, r.y);
+                return 1;
+            }
 
             int after = banner_pixels();
             if (after < before && before - after > worst) worst = before - after;

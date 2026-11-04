@@ -42,7 +42,11 @@
 // Round style: two big rings with a star pupil that travels inside them.
 #define STAR_EYE_D   44
 #define ROUND_EYE_CY 36
-#define EYES_TOP_ROW 7     // rows 0..6 are the text banner's
+// Rows 0..7 are one SH1106 page, and the banner owns it. The eye rect has to
+// start at the page boundary, not just below the glyphs: a rect starting at
+// row 7 still makes the driver send page 0, and any ink the eyes left in rows
+// 5..7 rides along with it and shows up as stray dashes above the face.
+#define EYES_TOP_ROW 8
 #define STAR_R       5
 #define ASTERISK_R   4
 #define SCRIBBLE_R       6
@@ -616,6 +620,12 @@ static void draw_brows(int cx_l, int cx_r, int cy, int r)
 
     int half = (r * s_cfg.brow_len) / 100;
     int top  = cy - r - s_cfg.brow_lift;
+
+    // Keep every pixel of the brow inside the eye band. A raised brow with a
+    // negative tilt reaches a few rows above the eyeball, and the banner page
+    // is not ours to draw in.
+    int highest = top + (s_cfg.brow_tilt < 0 ? s_cfg.brow_tilt : 0);
+    if (highest < EYES_TOP_ROW) top += EYES_TOP_ROW - highest;
 
     if (s_cfg.brow_mono) {
         // One line across both eyes, dipping at the bridge: the outer ends sit
