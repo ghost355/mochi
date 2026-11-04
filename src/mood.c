@@ -25,9 +25,14 @@ const mood_params_t k_moods[MOOD_COUNT] = {
     },
     [MOOD_HAPPY] = {
         .name = "happy",
+        // The eyes stay round — that is the whole point of the style. The smile
+        // comes from the lower lid pushing up into the eye, the way a cheek
+        // does, and from brows that ride high and level. A crescent eye would
+        // read as a different cartoon.
         .eyes = { .open_rest = 1.00f, .gaze_amp = 1.20f,
-                  .shape = EYE_SHAPE_HAPPY, .blink_min_ms = 1200, .blink_max_ms = 2600,
-                  .brow_len = 60, .brow_lift = 4, .brow_tilt = 0, .brow_thick = 3 },
+                  .shape = EYE_SHAPE_STAR_SOLID, .blink_min_ms = 1200, .blink_max_ms = 2600,
+                  .lid_bottom_pct = 15,
+                  .brow_len = 58, .brow_lift = 6, .brow_tilt = -2, .brow_thick = 3 },
         .duration_ms = 4000,
     },
     [MOOD_PLEADING] = {

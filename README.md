@@ -96,7 +96,7 @@ two pixels read as a hairline at this size, three read as a brow.
 |---|---|---|
 | idle | default | neutral caps, blink every 2-6 s |
 | curious | one tap | wider eyes, fast gaze, 2.5 s |
-| happy | two taps within 1.2 s | smile-arc eyes, 4 s |
+| happy | two taps within 1.2 s | eyes squeezed from below, brows high, 4 s |
 | pleading | three taps within 2 s | brows raised and pinched at the bridge, 4 s |
 | annoyed | four taps within 3 s | tilted lids, brows pulled down, 3 s |
 | angry | holding the pad 1.5 s | monobrow, steeper lids, 3.5 s |

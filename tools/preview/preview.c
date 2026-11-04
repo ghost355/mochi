@@ -117,8 +117,8 @@ static const shot_t k_shots[] = {
     { .label = "CURIOUS", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.12f, .seed = 1, .t_ms = 300,
       .brow_len = 62, .brow_lift = 6, .brow_tilt = -1 },
     // 2: happy — brows level
-    { .label = "HAPPY", .shape = EYE_SHAPE_HAPPY, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
-      .brow_len = 60, .brow_lift = 4, .brow_tilt = 0, .brow_thick = 3 },
+    { .label = "HAPPY", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
+      .lid_bottom_pct = 15, .brow_len = 58, .brow_lift = 6, .brow_tilt = -2, .brow_thick = 3 },
     // 3: annoyed — tilted lids, brows pulled down
     { .label = "ANNOYED", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .lid_pct = 32, .lid_angle = 22, .brow_len = 64, .brow_lift = 3, .brow_tilt = 6, .brow_thick = 3 },
