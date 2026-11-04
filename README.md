@@ -80,8 +80,9 @@ with short spikes poking out.
 Expression is carried by two parameters rather than by swapping bitmaps: a
 **lid** (`lid_pct`, `lid_angle`) that closes the circle like an eyelid instead
 of squashing it into an ellipse, and **brows** (`brow_len`, `brow_lift`,
-`brow_tilt`, `brow_mono`) drawn as a 2 px line, mirrored per eye, optionally
-joined into a monobrow.
+`brow_tilt`, `brow_thick`, `brow_mono`) drawn as a straight bar, mirrored per
+eye, optionally joined into a monobrow. Thickness matters more than length:
+two pixels read as a hairline at this size, three read as a brow.
 
 **Moods**, driven purely by touch:
 
@@ -90,6 +91,7 @@ joined into a monobrow.
 | idle | default | neutral caps, blink every 2-6 s |
 | curious | one tap | wider eyes, fast gaze, 2.5 s |
 | happy | two taps within 1.2 s | smile-arc eyes, 4 s |
+| pleading | three taps within 2 s | brows raised and pinched at the bridge, 4 s |
 | annoyed | four taps within 3 s | tilted lids, brows pulled down, 3 s |
 | angry | holding the pad 1.5 s | monobrow, steeper lids, 3.5 s |
 | sleepy | 45 s untouched | half-closed, slow blinks, until tapped |

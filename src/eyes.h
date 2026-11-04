@@ -70,6 +70,7 @@ typedef struct {
     int8_t         brow_len;    // percent, 0..100
     int8_t         brow_lift;   // pixels above the eyeball
     int8_t         brow_tilt;   // pixels, inner end lower
+    int8_t         brow_thick;  // rows; 2 is a hairline at this size, 3 reads as a brow
     int8_t         brow_mono;
 } eyes_config_t;
 

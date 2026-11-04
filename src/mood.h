@@ -7,6 +7,7 @@
  *   IDLE      default
  *   CURIOUS   one tap, lasts 2.5 s
  *   HAPPY     two taps within 1.2 s, lasts 4 s
+ *   PLEADING  three taps within 2 s, lasts 4 s
  *   ANNOYED   four taps within 3 s, lasts 3 s
  *   ANGRY     holding the pad for 1.5 s, lasts 3.5 s
  *   SLEEPY    45 s without a touch, until the next tap
@@ -28,6 +29,7 @@ typedef enum {
     MOOD_IDLE = 0,
     MOOD_CURIOUS,
     MOOD_HAPPY,
+    MOOD_PLEADING,
     MOOD_ANNOYED,
     MOOD_ANGRY,
     MOOD_SLEEPY,

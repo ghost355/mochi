@@ -577,8 +577,8 @@ static void draw_brow(int x0, int y0, int x1, int y1)
     int dx = x1 - x0;
     int n  = dx < 0 ? -dx : dx;
     if (n == 0) {
-        sh1106_set_pixel(x0, y0, true);
-        sh1106_set_pixel(x0, y0 - 1, true);
+        for (int k = 0; k < s_cfg.brow_thick; k++)
+            sh1106_set_pixel(x0, y0 + k, true);
         return;
     }
 
@@ -589,11 +589,11 @@ static void draw_brow(int x0, int y0, int x1, int y1)
         int x = x0 + (dx * i) / n;
         int y = (int)lrintf((float)y0 + (float)(y1 - y0) * t);
 
-        // Exactly two rows per column. Bridging the step as well would leave a
-        // one-pixel bump at every stair, which is what makes a two-pixel brow
-        // look like a thick bar with a thin line under it.
-        sh1106_set_pixel(x, y, true);
-        sh1106_set_pixel(x, y + 1, true);
+        // A constant thickness per column, no step bridging: bridging leaves a
+        // one-pixel bump at every stair, which is what makes a brow look like a
+        // thick bar with a thin line under it.
+        for (int k = 0; k < s_cfg.brow_thick; k++)
+            sh1106_set_pixel(x, y + k, true);
     }
 }
 
@@ -869,8 +869,13 @@ eyes_rect_t eyes_draw(void)
     // the framebuffer but never flushed, and when it is finally sent the old
     // brow from the previous mood is still on the panel, underneath it.
     int brow_h = 0;
-    if (round && s_cfg.brow_len > 0)
-        brow_h = (s_cfg.brow_lift > 0 ? s_cfg.brow_lift : 0) + 1;
+    if (round && s_cfg.brow_len > 0) {
+        // A negative tilt raises the inner end above `top`, so the band has to
+        // grow by that much too, or the highest part of the brow is painted
+        // outside the rect and never reaches the panel.
+        brow_h = (s_cfg.brow_lift > 0 ? s_cfg.brow_lift : 0)
+               + (s_cfg.brow_tilt < 0 ? -s_cfg.brow_tilt : 0) + 1;
+    }
 
     int x0 = cx_l - w / 2;
     int x1 = cx_r + w / 2;

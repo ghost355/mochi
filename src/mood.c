@@ -13,21 +13,30 @@ const mood_params_t k_moods[MOOD_COUNT] = {
         .name = "idle",
         .eyes = { .open_rest = 1.00f, .gaze_amp = 1.00f,
                   .shape = EYE_SHAPE_CAPSULE, .blink_min_ms = 2200, .blink_max_ms = 6500,
-                  .brow_len = 76, .brow_lift = 3, .brow_tilt = 0 },
+                  .brow_len = 62, .brow_lift = 3, .brow_tilt = 0, .brow_thick = 3 },
         .duration_ms = 0,
     },
     [MOOD_CURIOUS] = {
         .name = "curious",
         .eyes = { .open_rest = 1.12f, .gaze_amp = 1.60f,
                   .shape = EYE_SHAPE_CAPSULE, .blink_min_ms = 1500, .blink_max_ms = 3000,
-                  .brow_len = 64, .brow_lift = 6, .brow_tilt = 0 },
+                  .brow_len = 52, .brow_lift = 6, .brow_tilt = 0, .brow_thick = 3 },
         .duration_ms = 2500,
     },
     [MOOD_HAPPY] = {
         .name = "happy",
         .eyes = { .open_rest = 1.00f, .gaze_amp = 1.20f,
                   .shape = EYE_SHAPE_HAPPY, .blink_min_ms = 1200, .blink_max_ms = 2600,
-                  .brow_len = 76, .brow_lift = 4, .brow_tilt = 0 },
+                  .brow_len = 60, .brow_lift = 4, .brow_tilt = 0, .brow_thick = 3 },
+        .duration_ms = 4000,
+    },
+    [MOOD_PLEADING] = {
+        .name = "pleading",
+        // Brows raised and pinched at the bridge: the inner ends sit five
+        // pixels above the outer ones, which is the whole expression.
+        .eyes = { .open_rest = 1.10f, .gaze_amp = 0.80f,
+                  .shape = EYE_SHAPE_CAPSULE, .blink_min_ms = 1600, .blink_max_ms = 3200,
+                  .brow_len = 60, .brow_lift = 2, .brow_tilt = -4, .brow_thick = 3 },
         .duration_ms = 4000,
     },
     [MOOD_ANNOYED] = {
@@ -35,7 +44,7 @@ const mood_params_t k_moods[MOOD_COUNT] = {
         .eyes = { .open_rest = 1.00f, .gaze_amp = 0.40f,
                   .shape = EYE_SHAPE_CAPSULE, .blink_min_ms = 900, .blink_max_ms = 1800,
                   .lid_pct = 32, .lid_angle = 22,
-                  .brow_len = 80, .brow_lift = 3, .brow_tilt = 7 },
+                  .brow_len = 64, .brow_lift = 3, .brow_tilt = 6, .brow_thick = 3 },
         .duration_ms = 3000,
     },
     [MOOD_ANGRY] = {
@@ -43,7 +52,7 @@ const mood_params_t k_moods[MOOD_COUNT] = {
         .eyes = { .open_rest = 1.00f, .gaze_amp = 0.30f,
                   .shape = EYE_SHAPE_CAPSULE, .blink_min_ms = 1100, .blink_max_ms = 2400,
                   .lid_pct = 34, .lid_angle = 28,
-                  .brow_len = 84, .brow_lift = 4, .brow_tilt = 12, .brow_mono = 1 },
+                  .brow_len = 72, .brow_lift = 4, .brow_tilt = 10, .brow_thick = 3, .brow_mono = 1 },
         .duration_ms = 3500,
     },
     [MOOD_SLEEPY] = {
@@ -51,7 +60,7 @@ const mood_params_t k_moods[MOOD_COUNT] = {
         .eyes = { .open_rest = 1.00f, .gaze_amp = 0.50f,
                   .shape = EYE_SHAPE_CAPSULE, .blink_min_ms = 4000, .blink_max_ms = 9000,
                   .lid_pct = 46, .lid_bottom_pct = 18,
-                  .brow_len = 70, .brow_lift = 1, .brow_tilt = 0 },
+                  .brow_len = 58, .brow_lift = 1, .brow_tilt = 0, .brow_thick = 3 },
         .duration_ms = 0,
     },
 };
@@ -106,6 +115,8 @@ void mood_tap(uint32_t now_ms)
     if (taps_in_window(now_ms, 3000) >= 4) {
         enter(MOOD_ANNOYED, now_ms);
         buzzer_play(&buzzer_sad);
+    } else if (taps_in_window(now_ms, 2000) >= 3) {
+        enter(MOOD_PLEADING, now_ms);
     } else if (taps_in_window(now_ms, 1200) >= 2) {
         enter(MOOD_HAPPY, now_ms);
     } else {

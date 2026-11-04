@@ -99,38 +99,42 @@ typedef struct {
     int8_t        brow_len;
     int8_t        brow_lift;
     int8_t        brow_tilt;
+    int8_t        brow_thick;
     int8_t        brow_mono;
 } shot_t;
 
 static const shot_t k_shots[] = {
     // 0: idle — filled eyes, blob pupils, straight brows
     { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
-      .brow_len = 76, .brow_lift = 3, .brow_tilt = 0 },
+      .brow_len = 62, .brow_lift = 3, .brow_tilt = 0, .brow_thick = 3 },
     // 1: curious — wide eyes, brows up
     { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.12f, .seed = 1, .t_ms = 300,
       .brow_len = 62, .brow_lift = 6, .brow_tilt = -1 },
     // 2: happy — brows level
     { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
-      .brow_len = 76, .brow_lift = 4, .brow_tilt = 0 },
+      .brow_len = 60, .brow_lift = 4, .brow_tilt = 0, .brow_thick = 3 },
     // 3: annoyed — tilted lids, brows pulled down
     { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
-      .lid_pct = 32, .lid_angle = 22, .brow_len = 80, .brow_lift = 3, .brow_tilt = 7 },
+      .lid_pct = 32, .lid_angle = 22, .brow_len = 64, .brow_lift = 3, .brow_tilt = 6, .brow_thick = 3 },
     // 4: angry — monobrow
     { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
-      .lid_pct = 34, .lid_angle = 28, .brow_len = 84, .brow_lift = 4, .brow_tilt = 12, .brow_mono = 1 },
-    // 5: sleepy — half lid
+      .lid_pct = 34, .lid_angle = 28, .brow_len = 72, .brow_lift = 4, .brow_tilt = 10, .brow_thick = 3, .brow_mono = 1 },
+    // 5: pleading — brows raised and pinched at the bridge
+    { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.10f, .seed = 1, .t_ms = 300,
+      .brow_len = 60, .brow_lift = 2, .brow_tilt = -4, .brow_thick = 3 },
+    // 5b: sleepy — half lid
     { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .lid_pct = 48, .brow_len = 70, .brow_lift = 1, .brow_tilt = 2 },
     // 6: idle, mid blink
     { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
-      .blink = true, .brow_len = 76, .brow_lift = 3, .brow_tilt = 0 },
+      .blink = true, .brow_len = 62, .brow_lift = 3, .brow_tilt = 0, .brow_thick = 3 },
     // 7: idle, looking left
     { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .glance = true, .glance_x = -6.0f, .glance_y = 0.0f,
-      .brow_len = 76, .brow_lift = 3, .brow_tilt = 0 },
+      .brow_len = 62, .brow_lift = 3, .brow_tilt = 0, .brow_thick = 3 },
     // 8: ring style, same face
     { .shape = EYE_SHAPE_STAR_RING,  .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
-      .brow_len = 76, .brow_lift = 3, .brow_tilt = 0 },
+      .brow_len = 62, .brow_lift = 3, .brow_tilt = 0, .brow_thick = 3 },
 };
 
 #define N_SHOTS ((int)(sizeof(k_shots) / sizeof(k_shots[0])))
@@ -154,6 +158,7 @@ static void render_cell(int index, int ox, int oy)
     cfg.brow_len    = s->brow_len;
     cfg.brow_lift   = s->brow_lift;
     cfg.brow_tilt   = s->brow_tilt;
+    cfg.brow_thick  = s->brow_thick ? s->brow_thick : 3;
     cfg.brow_mono   = s->brow_mono;
 
     memset(fb, 0, sizeof(fb));
@@ -215,6 +220,7 @@ static void anim(const char *dir, eye_shape_t shape, pupil_style_t pupil)
     cfg.brow_len     = 76;
     cfg.brow_lift    = 3;
     cfg.brow_tilt    = 0;
+    cfg.brow_thick   = 3;
 
     eyes_init(3);
     eyes_set_config(&cfg);
