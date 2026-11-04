@@ -1,0 +1,212 @@
+# mochi
+
+A Dasai-Mochi-style desk robot on a **Waveshare RP2350-USB-A**, in plain C
+against **Pico SDK 2.x**. No Arduino layer, no graphics library, no bitmap
+frame assets — the face is drawn procedurally and only the pixels that changed
+are pushed over I2C.
+
+```
+    +------------------------+          blink, saccades, moods,
+    |   ####      ####       |          yawns, winks, touch reactions
+    |  ##  ##    ##  ##      |          and a passive-piezo voice
+    | ##    ##  ##    ##     |
+    | ##    ##  ##    ##     |          128x64 SH1106 over I2C
+    |  ##  ##    ##  ##      |          TTP223 touch on GP2
+    |   ####      ####       |          piezo on GP3
+    +------------------------+
+```
+
+## Hardware
+
+| Part | Notes |
+|---|---|
+| Waveshare RP2350-USB-A | RP2350A, 150 MHz, 520 KB SRAM, 2 MB flash |
+| OLED 1.3" 128x64 | SH1106 controller, I2C, address 0x3C |
+| TTP223 | capacitive touch, push-pull OUT |
+| Passive piezo buzzer | a **piezo disc**, not a magnetic buzzer |
+| Breadboard, jumpers | |
+
+Wiring:
+
+```
+        RP2350-USB-A                    OLED (SH1106)
+     +---------------+                 +--------------+
+     |          3V3  +-----------------+  VCC         |
+     |          GND  +-----------------+  GND         |
+     |     GP4 (SDA) +-----------------+  SDA         |
+     |     GP5 (SCL) +-----------------+  SCL         |
+     |               |                 +--------------+
+     |      GP2  +--------------------- TTP223 OUT
+     |      GP3  +---[100R]------------ piezo +
+     |          GND  ------------------ piezo -
+     |   GP0/GP1     UART0 debug (optional)
+     +---------------+
+```
+
+A piezo is a capacitor: the pin only charges it, current stays in the low
+milliamps, so it can hang off a GPIO with just a series resistor. A **magnetic**
+buzzer (coil, tens of ohms) would need an NPN/MOSFET driver and a flyback diode.
+
+> Power through the **USB-C** port only. The USB-A plug is a PIO-USB *host*
+> port; feeding 5 V into it while USB-C is connected means two supplies
+> fighting.
+
+## What it does
+
+**Face.** Two capsule eyes drawn parametrically:
+
+- blink every 2-6 s (130 ms, smooth close/open curve, occasional double blink)
+- saccades: the gaze jumps to a new offset every 1-3 s and eases there in ~100 ms
+- slow vertical drift so the face never looks frozen
+- per-eye control, so one eyelid can move while the other stays open
+
+**Moods**, driven purely by touch:
+
+| Mood | Trigger | Face |
+|---|---|---|
+| idle | default | neutral caps, blink every 2-6 s |
+| curious | one tap | wider eyes, fast gaze, 2.5 s |
+| happy | two taps within 1.2 s | smile-arc eyes, 4 s |
+| annoyed | four taps within 3 s | narrow slits, fast blinking, 3 s |
+| sleepy | 45 s untouched | half-closed, slow blinks, until tapped |
+
+The mood supplies eye parameters (openness, blink rate, saccade amplitude,
+shape); the eye engine stays a dumb renderer. Shapes are procedural: a capsule
+for neutral, and an ellipse-minus-ellipse crescent for smile and frown, so a
+happy face still blinks correctly.
+
+**Personality:**
+
+- resting openness glides at 0.6 units/s, so falling asleep closes the eyes
+  over about a second instead of snapping shut
+- waking up triggers a yawn (squeeze shut, throw wide, settle) with a low
+  falling phrase
+- falling asleep plays a two-note goodnight
+- every 7-16 s the face performs an involuntary gesture: a wink, or a sudden
+  glance elsewhere
+
+**Touch** (TTP223 on GP2, polled at frame rate with a 30 ms debounce): a tap pops
+the eyes wide, a press past 700 ms squints them and starts a drone, release
+blinks.
+
+Holding a finger on the sensor for 2 s paints `РУКИ УБРАЛ!!!` across the bottom
+of the screen — 117 px of the 128 available. It is painted after the eyes so it
+always wins, and erased the frame the hand comes off.
+
+**Sound** (passive piezo on GP3, PWM slice, fully non-blocking): startup
+arpeggio, tap chirp, hold drone, release phrase, yawn, goodnight.
+
+## Why the pieces are hand-written
+
+- **SH1106 driver.** U8g2 is the obvious choice, but it always blits the full
+  1 KB framebuffer — it has no partial-region send on I2C. A blink then costs
+  ~25 ms of bus time at 400 kHz, which is most of a 30 fps frame. The driver
+  here is ~130 lines and exposes `sh1106_flush_region()`, so a blink costs two
+  pages instead of eight.
+- **Eye engine.** RoboEyes (FluxGarage) is Arduino-only and GPL-3.0, so nothing
+  is copied from it. Drawing capsules and crescents directly is a few hundred
+  lines and gives exact control over the dirty rectangle.
+- **Font.** ASCII comes from the classic public-domain 5x7 fixed font, Cyrillic
+  is hand-drawn in the same cell. Uppercase only: lowercase Cyrillic is
+  unreadable at 5 px, so lowercase input maps to the uppercase glyphs.
+
+## Frame budget
+
+The SH1106 is not an SSD1306. Two differences matter:
+
+- its RAM is **132 columns** wide and the visible 128 start at column 2, so
+  every column address is biased by 2;
+- there is **no horizontal addressing mode**: data is written page by page, and
+  each page needs its own page+column address transaction.
+
+At 400 kHz that makes a full frame 8 transactions and ~23 ms — too slow to do
+30 times a second — while the two-page eye region costs ~6 ms. So the loop runs
+at 50 fps, the eye engine reports a dirty rectangle, and frames where nothing
+moved push nothing at all: roughly **4 display updates per second at idle** out
+of 50 rendered frames.
+
+## Serial output
+
+USB CDC, or UART0 on GP0/GP1 at 115200:
+
+```
+boot: mochi M1
+I2C found 0x3C
+display: SH1106 @ 0x3C
+fps=50 upd=4
+mood: curious
+touch: release 1240ms
+```
+
+`upd` is how many of those 50 frames pushed pixels to the panel. Close to `fps`
+means something is moving constantly; 0 means the animation state machine is
+stuck.
+
+If the firmware runs from a power bank with no data lines, USB CDC never
+enumerates and the log goes nowhere — the firmware does not block on it.
+
+## Build
+
+Needs CMake, Ninja and Pico SDK 2.x:
+
+```sh
+git clone https://github.com/raspberrypi/pico-sdk.git ~/pico-sdk
+cd ~/pico-sdk && git submodule update --init
+
+export PICO_SDK_PATH=~/pico-sdk
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j8
+```
+
+Output: `build/mochi.uf2`.
+
+If your `arm-none-eabi-gcc` comes from a package that builds it compiler-only
+(some Homebrew formulae do — no newlib, links fail with `cannot find -lc`), point
+CMake at a full toolchain instead:
+
+```sh
+export PICO_TOOLCHAIN_PATH=/path/to/xpack-arm-none-eabi-gcc
+```
+
+## Flash
+
+1. Hold **BOOT**, plug in **USB-C**, release **BOOT**.
+2. A disk named `RPI-RP2` appears.
+3. Copy `build/mochi.uf2` onto it. The board reboots into the new firmware.
+
+## Layout
+
+```
+src/
+  board.h              pin map, I2C address, baud rate
+  main.c               boot screen, frame loop, FPS/update counter, hold banner
+  eyes.h/.c            procedural eye engine (blink, saccade, drift, yawn, wink)
+  mood.h/.c            mood state machine + per-mood eye parameters
+  touch.h/.c           TTP223 polled input with a debounce state machine
+  buzzer.h/.c          non-blocking PWM melody player for a piezo
+  display/
+    sh1106.h/.c        minimal SH1106 I2C driver (full + partial flush)
+    font5x7.h/.c       5x7 font, ASCII + Cyrillic, UTF-8 decoding
+boards/
+  waveshare_rp2350_usb_a.h   SDK board header (2 MB flash, no LED pin)
+```
+
+The custom board header exists because the stock `pico2` board declares 4 MB of
+flash while this board has 2 MB, and it has no plain GPIO LED (the onboard
+WS2812 sits on GP16, which is not broken out).
+
+## Roadmap
+
+- [x] **M0** — build, bus scan, SH1106, text, partial updates
+- [x] **M1** — procedural eye engine: blink, saccades, idle drift
+- [x] **M2** — TTP223 touch: tap / hold / release reactions
+- [x] **M3** — passive piezo: non-blocking PWM tone player with melodies
+- [x] **M4** — moods: state machine, expressions, personality, wake/sleep
+- [ ] **M5** — LiPo + charger, battery monitor via ADC, deep sleep
+- [ ] **M6** — two more touch sensors, so the eyes look toward the side you touch
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+The ASCII glyphs in `font5x7.c` are the classic public-domain 5x7 fixed font.

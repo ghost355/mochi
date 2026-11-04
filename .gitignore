@@ -1,0 +1,17 @@
+# Build output
+build/
+cmake-build-*/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Toolchain artifacts
+*.elf
+*.bin
+*.hex
+*.uf2
+*.map
+*.dis
