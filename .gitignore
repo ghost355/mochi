@@ -22,5 +22,6 @@ cmake-build-*/
 
 # preview renderer artifacts
 tools/preview/preview
+tools/preview/mirror_test
 tools/preview/preview.ppm
 tools/preview/preview.png

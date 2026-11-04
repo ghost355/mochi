@@ -2,6 +2,7 @@
 #
 #   make            build ./preview
 #   make sheet      build, render, convert to PNG
+#   make check      verify the dirty-rect flush converges (see mirror_test.c)
 #   make clean
 
 CC      ?= clang
@@ -23,7 +24,13 @@ sheet: preview
 	ffmpeg -loglevel error -y -i preview.ppm preview.png
 	@echo "wrote preview.png"
 
-clean:
-	rm -f preview preview.ppm preview.png
+mirror_test: mirror_test.c $(SRC)/eyes.c
+	$(CC) $(CFLAGS) $(INCS) mirror_test.c $(SRC)/eyes.c -o mirror_test -lm
 
-.PHONY: sheet clean
+check: mirror_test
+	./mirror_test
+
+clean:
+	rm -f preview preview.ppm preview.png mirror_test
+
+.PHONY: sheet check clean

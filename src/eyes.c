@@ -825,9 +825,17 @@ eyes_rect_t eyes_draw(void)
         return none;
     }
 
+    // Brows live above the eyeballs, so the dirty rect has to reach up to
+    // them. Missing that band is not a cosmetic bug: the brow is painted into
+    // the framebuffer but never flushed, and when it is finally sent the old
+    // brow from the previous mood is still on the panel, underneath it.
+    int brow_h = 0;
+    if (round && s_cfg.brow_len > 0)
+        brow_h = (s_cfg.brow_lift > 0 ? s_cfg.brow_lift : 0) + 3;
+
     int x0 = cx_l - w / 2;
     int x1 = cx_r + w / 2;
-    int y0 = cy - h / 2;
+    int y0 = cy - h / 2 - brow_h;
     int y1 = cy + h / 2;
 
     // Clear the previous frame's area first: the eyes move and shrink, so the
