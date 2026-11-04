@@ -9,10 +9,12 @@ are pushed over I2C.
   <img src="docs/demo.gif" width="380" alt="mochi blinking, then squinting">
 </p>
 
-Two eyes, blink every 2-6 s, saccades, six moods, and a passive-piezo voice —
+Two eyes, blink every 2-6 s, saccades, nine moods, and a passive-piezo voice —
 on a breadboard, with an SH1106 OLED and a TTP223 touch pad. The clip above is
 handheld footage, stabilised by tracking the module in frame and cancelling the
 hand movement.
+
+**[How to wire it, flash it and use it →](docs/USAGE.md)** (in Russian)
 
 ## Hardware
 
@@ -262,6 +264,8 @@ src/
     font5x7.h/.c       5x7 font, ASCII + Cyrillic, UTF-8 decoding
 boards/
   waveshare_rp2350_usb_a.h   SDK board header (2 MB flash, no LED pin)
+docs/
+  USAGE.md             wiring, flashing and gesture manual (Russian)
 ```
 
 The custom board header exists because the stock `pico2` board declares 4 MB of
