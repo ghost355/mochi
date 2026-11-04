@@ -47,7 +47,7 @@
 #define ASTERISK_R   4
 #define SCRIBBLE_R       6
 #define DOT_R            3
-#define BLOB_CORE_R      3
+#define BLOB_CORE_R      7
 #define STAR_GAP     8
 #define STAR_RING    2
 #define STAR_PUPIL_GAIN 1.3f
@@ -276,33 +276,36 @@ static void draw_scribble(int cx, int cy, int eye, int pct, bool on)
 
 static void draw_dot(int cx, int cy, int r, bool on);
 
-// A fat disc with short spikes: the pupil reads as a blob of ink with a few
-// bristles, not as a star. The eight spokes are rotated off the axes, and by a
-// different angle per eye: a cross at 0/45 degrees looks printed, and a pair
-// of identical crosses looks stamped.
-static const float k_blob_rot[2] = { 21.0f, -27.0f };
+// The pupil is a hand-drawn asterisk: six arms meeting at the centre, with a
+// fat hub so the junction reads as ink. At eleven pixels across a two-pixel
+// arm has no room to breathe between its neighbours — the arms join and the
+// whole pupil collapses into a disc — so the arms are one pixel and the weight
+// comes from the hub and from the arm count.
+static const float k_blob_rot[2]  = {  9.0f, -14.0f };   // per eye
+static const int8_t k_blob_len[6] = {  5, 4, 5, 4, 5, 5 };
 
 static void draw_blob(int cx, int cy, int eye, int pct, bool on)
 {
-    int core = (BLOB_CORE_R * pct) / 100;
-    if (core < 1) core = 1;
+    if (pct < 70) {
+        // Eyelid nearly shut: two pixels of ink are enough.
+        sh1106_set_pixel(cx, cy, on);
+        sh1106_set_pixel(cx + 1, cy, on);
+        return;
+    }
 
-    draw_dot(cx, cy, core, on);
+    for (int dy = 0; dy < 2; dy++)
+        for (int dx = 0; dx < 2; dx++)
+            sh1106_set_pixel(cx + dx, cy + dy, on);
 
-    if (pct < 70) return;          // the eyelid takes the spikes first
-
-    for (int i = 0; i < 8; i++) {
-        float a = (k_blob_rot[eye] + 45.0f * (float)i) * (PI_F / 180.0f);
+    for (int i = 0; i < 6; i++) {
+        float a = (k_blob_rot[eye] + 60.0f * (float)i - 90.0f) * (PI_F / 180.0f);
         float ca = cosf(a);
         float sa = sinf(a);
 
-        // Start one pixel inside the disc radius so every spoke is attached to
-        // the blob; the outer end is two pixels past it, the same reach the
-        // axial version had.
-        for (int r = core - 1; r <= core + 2; r++) {
-            int x = (int)lrintf(ca * (float)r);
-            int y = (int)lrintf(sa * (float)r);
-            sh1106_set_pixel(cx + x, cy + y, on);
+        int len = k_blob_len[(i + eye) % 6];
+        for (int r = 1; r <= len; r++) {
+            sh1106_set_pixel(cx + (int)lrintf(ca * (float)r),
+                             cy + (int)lrintf(sa * (float)r), on);
         }
     }
 }
