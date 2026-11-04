@@ -5,16 +5,13 @@ against **Pico SDK 2.x**. No Arduino layer, no graphics library, no bitmap
 frame assets — the face is drawn procedurally and only the pixels that changed
 are pushed over I2C.
 
-```
-    +------------------------+          blink, saccades, moods,
-    |   ####      ####       |          yawns, winks, touch reactions
-    |  ##  ##    ##  ##      |          and a passive-piezo voice
-    | ##    ##  ##    ##     |
-    | ##    ##  ##    ##     |          128x64 SH1106 over I2C
-    |  ##  ##    ##  ##      |          TTP223 touch on GP2
-    |   ####      ####       |          piezo on GP3
-    +------------------------+
-```
+<p align="center">
+  <img src="docs/demo.gif" width="400" alt="mochi blinking">
+</p>
+
+Two capsule eyes, blink every 2-6 s, saccades, five moods, a yawn when it wakes
+up, and a passive-piezo voice — on a breadboard, with an SH1106 OLED and a
+TTP223 touch pad.
 
 ## Hardware
 
@@ -50,6 +47,11 @@ buzzer (coil, tens of ohms) would need an NPN/MOSFET driver and a flyback diode.
 > Power through the **USB-C** port only. The USB-A plug is a PIO-USB *host*
 > port; feeding 5 V into it while USB-C is connected means two supplies
 > fighting.
+
+<p align="center">
+  <img src="docs/setup.jpg" width="640" alt="mochi on a breadboard">
+</p>
+
 
 ## What it does
 

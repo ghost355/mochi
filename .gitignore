@@ -15,3 +15,7 @@ cmake-build-*/
 *.uf2
 *.map
 *.dis
+
+# Raw captures (only the processed docs/ assets are tracked)
+*.MOV
+*.mov
