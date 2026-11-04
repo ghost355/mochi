@@ -47,7 +47,7 @@
 #define ASTERISK_R   4
 #define SCRIBBLE_R       6
 #define DOT_R            3
-#define BLOB_CORE_R      7
+#define BLOB_CORE_R      4
 #define STAR_GAP     8
 #define STAR_RING    2
 #define STAR_PUPIL_GAIN 1.3f
@@ -276,13 +276,32 @@ static void draw_scribble(int cx, int cy, int eye, int pct, bool on)
 
 static void draw_dot(int cx, int cy, int r, bool on);
 
-// The pupil is a hand-drawn asterisk: six arms meeting at the centre, with a
-// fat hub so the junction reads as ink. At eleven pixels across a two-pixel
-// arm has no room to breathe between its neighbours — the arms join and the
-// whole pupil collapses into a disc — so the arms are one pixel and the weight
-// comes from the hub and from the arm count.
-static const float k_blob_rot[2]  = {  9.0f, -14.0f };   // per eye
-static const int8_t k_blob_len[6] = {  5, 4, 5, 4, 5, 5 };
+// The pupil is a hand-drawn asterisk, authored as two 7x7 masks rather than
+// generated from angles. At this size a generator is fighting rounding: a spike
+// that lands one pixel off the lattice reads as a detached dot, and the arms
+// come out with different thicknesses. Seven by seven is the smallest size
+// where six short arms still read as a star; the two eyes get different masks
+// so the pair never looks stamped.
+static const char *const k_pupil[2][7] = {
+    {   // left: long arm up, short arm to the upper right
+        "...#...",
+        ".#.#.#.",
+        "..###..",
+        ".#####.",
+        "..###..",
+        ".#.#...",
+        "...#...",
+    },
+    {   // right: same mark, pushed right and down
+        "...#...",
+        ".#.#...",
+        "..###..",
+        ".#####.",
+        "..###..",
+        ".#.#.#.",
+        "...#...",
+    },
+};
 
 static void draw_blob(int cx, int cy, int eye, int pct, bool on)
 {
@@ -293,21 +312,10 @@ static void draw_blob(int cx, int cy, int eye, int pct, bool on)
         return;
     }
 
-    for (int dy = 0; dy < 2; dy++)
-        for (int dx = 0; dx < 2; dx++)
-            sh1106_set_pixel(cx + dx, cy + dy, on);
-
-    for (int i = 0; i < 6; i++) {
-        float a = (k_blob_rot[eye] + 60.0f * (float)i - 90.0f) * (PI_F / 180.0f);
-        float ca = cosf(a);
-        float sa = sinf(a);
-
-        int len = k_blob_len[(i + eye) % 6];
-        for (int r = 1; r <= len; r++) {
-            sh1106_set_pixel(cx + (int)lrintf(ca * (float)r),
-                             cy + (int)lrintf(sa * (float)r), on);
-        }
-    }
+    for (int r = 0; r < 7; r++)
+        for (int c = 0; c < 7; c++)
+            if (k_pupil[eye][r][c] == '#')
+                sh1106_set_pixel(cx + c - 3, cy + r - 3, on);
 }
 
 static void draw_dot(int cx, int cy, int r, bool on)
