@@ -47,7 +47,7 @@
 #define ASTERISK_R   4
 #define SCRIBBLE_R       6
 #define DOT_R            3
-#define BLOB_CORE_R      5
+#define BLOB_CORE_R      4
 #define STAR_GAP     8
 #define STAR_RING    2
 #define STAR_PUPIL_GAIN 1.3f
@@ -278,32 +278,27 @@ static void draw_dot(int cx, int cy, int r, bool on);
 
 // The pupil is a hand-drawn asterisk, authored as two 7x7 masks rather than
 // generated from angles. At this size a generator is fighting rounding: a spike
-// that lands one pixel off the lattice reads as a detached dot, and the arms
-// come out with different thicknesses. Seven by seven is the smallest size
-// where six short arms still read as a star; the two eyes get different masks
-// so the pair never looks stamped.
-static const char *const k_pupil[2][9] = {
-    {   // left: the seven-by-seven mark, one pixel further out on every arm
-        "....#....",
-        "....#....",
-        ".#..#..#.",
-        "..#.#.#..",
-        "..#####..",
-        "..#.#.#..",
-        ".#..#..#.",
-        "....#....",
-        "....#....",
+// that lands one pixel off the 8-connected lattice reads as a detached dot, and
+// arm thickness varies with rounding. Two masks, different per eye, give the
+// same hand-drawn mark every frame.
+static const char *const k_pupil[2][7] = {
+    {   // left: long arm up, short arm to the upper right
+        "...#...",
+        ".#.#.#.",
+        "..###..",
+        ".#####.",
+        "..###..",
+        ".#.#...",
+        "...#...",
     },
-    {   // right: same mark with the lower right arm bitten short
-        "....#....",
-        "....#....",
-        ".#..#..#.",
-        "..#.#.#..",
-        "..#####..",
-        "..#.#.#..",
-        ".#..#....",
-        "....#....",
-        "....#....",
+    {   // right: same mark, pushed right and down
+        "...#...",
+        ".#.#...",
+        "..###..",
+        ".#####.",
+        "..###..",
+        ".#.#.#.",
+        "...#...",
     },
 };
 
@@ -316,10 +311,10 @@ static void draw_blob(int cx, int cy, int eye, int pct, bool on)
         return;
     }
 
-    for (int r = 0; r < 9; r++)
-        for (int c = 0; c < 9; c++)
+    for (int r = 0; r < 7; r++)
+        for (int c = 0; c < 7; c++)
             if (k_pupil[eye][r][c] == '#')
-                sh1106_set_pixel(cx + c - 4, cy + r - 4, on);
+                sh1106_set_pixel(cx + c - 3, cy + r - 3, on);
 }
 
 static void draw_dot(int cx, int cy, int r, bool on)
