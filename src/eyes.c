@@ -291,12 +291,19 @@ static void draw_blob(int cx, int cy, int eye, int pct, bool on)
     for (int i = 0; i < 8; i++) {
         int k = (i + eye) & 7;
         bool cardinal = (dx[k] == 0 || dy[k] == 0);
-        int len = core + (cardinal ? 2 : 1);
 
-        if (pct < 70) len = core;      // the eyelid takes the tails first
+        if (pct < 70) continue;        // the eyelid takes the tails first
 
-        for (int r = core + 1; r <= len; r++)
-            sh1106_set_pixel(cx + dx[k] * r, cy + dy[k] * r, on);
+        if (cardinal) {
+            for (int r = core + 1; r <= core + 2; r++)
+                sh1106_set_pixel(cx + dx[k] * r, cy + dy[k] * r, on);
+        } else {
+            // A one-pixel stub on the diagonal only meets the disc at a corner,
+            // and a corner touch reads as a separate dot at this scale. Fill the
+            // notch instead: two pixels sharing an edge with the disc.
+            sh1106_set_pixel(cx + dx[k] * core, cy + dy[k] * (core - 1), on);
+            sh1106_set_pixel(cx + dx[k] * (core - 1), cy + dy[k] * core, on);
+        }
     }
 }
 
