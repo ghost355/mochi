@@ -107,6 +107,8 @@ typedef struct {
     int8_t        brow_tilt;
     int8_t        brow_thick;
     int8_t        brow_mono;
+    uint8_t       scale;
+    uint8_t       pupil_scale;
 } shot_t;
 
 static const shot_t k_shots[] = {
@@ -131,6 +133,10 @@ static const shot_t k_shots[] = {
     // 5b: sleepy — half lid
     { .label = "SLEEPY", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .lid_pct = 48, .brow_len = 70, .brow_lift = 1, .brow_tilt = 2 },
+    { .label = "PANIC", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_DOT, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
+      .scale = 132, .pupil_scale = 40, .brow_len = 70, .brow_lift = 12, .brow_tilt = -3, .brow_thick = 3 },
+    { .label = "FOCUS", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
+      .lid_pct = 16, .lid_angle = 12, .brow_len = 66, .brow_lift = 1, .brow_tilt = 7, .brow_thick = 3 },
     // 6: idle, mid blink
     { .label = "BLINK", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .blink = true, .brow_len = 62, .brow_lift = 3, .brow_tilt = 0, .brow_thick = 3 },
@@ -166,6 +172,8 @@ static void render_cell(int index, int ox, int oy)
     cfg.brow_tilt   = s->brow_tilt;
     cfg.brow_thick  = s->brow_thick ? s->brow_thick : 3;
     cfg.brow_mono   = s->brow_mono;
+    cfg.scale       = s->scale;
+    cfg.pupil_scale = s->pupil_scale;
 
     memset(fb, 0, sizeof(fb));
     eyes_init(s->seed);
@@ -224,6 +232,52 @@ static void render_cell(int index, int ox, int oy)
         ;
 }
 
+static void write_ppm(const char *path)
+{
+    FILE *fp = fopen(path, "wb");
+    if (!fp) { perror(path); return; }
+    fprintf(fp, "P6\n%d %d\n255\n", SH1106_WIDTH, SH1106_HEIGHT);
+    for (int y = 0; y < SH1106_HEIGHT; y++)
+        for (int x = 0; x < SH1106_WIDTH; x++) {
+            bool on = fb[y][x] != 0;
+            fputc(on ? 190 : 6, fp);
+            fputc(on ? 220 : 8, fp);
+            fputc(on ? 255 : 14, fp);
+        }
+    fclose(fp);
+}
+
+// The power-on: eyes shut, lids lift, the pupil resolves out of a blur.
+static void boot_anim(const char *dir)
+{
+    eyes_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.open_rest    = 1.0f;
+    cfg.gaze_amp     = 1.0f;
+    cfg.shape        = EYE_SHAPE_STAR_SOLID;
+    cfg.blink_min_ms = 4000;
+    cfg.blink_max_ms = 8000;
+    cfg.pupil        = PUPIL_BLOB;
+    cfg.brow_len     = 62;
+    cfg.brow_lift    = 3;
+    cfg.brow_thick   = 3;
+
+    eyes_init(3);
+    eyes_set_config(&cfg);
+    eyes_boot(0);
+
+    const int frames = 45;              // 1.8 s at 25 fps
+    for (int f = 0; f < frames; f++) {
+        eyes_update((uint32_t)f * 40u);
+        eyes_draw();
+
+        char path[512];
+        snprintf(path, sizeof(path), "%s/f%03d.ppm", dir, f);
+        write_ppm(path);
+    }
+    printf("wrote %d boot frames to %s\n", frames, dir);
+}
+
 // --- Animation mode --------------------------------------------------------
 //
 // Writes a numbered sequence of 1:1 frames so ffmpeg can turn it into a GIF:
@@ -280,6 +334,11 @@ int main(int argc, char **argv)
 {
     if (argc >= 5 && strcmp(argv[1], "--anim") == 0) {
         anim(argv[2], (eye_shape_t)atoi(argv[3]), (pupil_style_t)atoi(argv[4]));
+        return 0;
+    }
+
+    if (argc >= 3 && strcmp(argv[1], "--boot") == 0) {
+        boot_anim(argv[2]);
         return 0;
     }
 

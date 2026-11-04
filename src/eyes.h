@@ -72,6 +72,17 @@ typedef struct {
     int8_t         brow_tilt;   // pixels, inner end lower
     int8_t         brow_thick;  // rows; 2 is a hairline at this size, 3 reads as a brow
     int8_t         brow_mono;
+    // Face scale, percent. 100 is the normal size; panic pushes the eyes past
+    // the screen edges, so anything the drawing overruns is simply clipped.
+    // Unsigned on purpose: an int8_t would wrap 132 into a negative number and
+    // the mood would silently do nothing.
+    uint8_t        scale;
+    // Pupil scale, percent. 100 is normal, 40 is the pinprick of a frightened
+    // character. Only the round styles have a pupil to shrink.
+    uint8_t        pupil_scale;
+    // Milliseconds between saccades. 0 keeps the idle rhythm (0.9-3.2 s);
+    // panic sets it to 200 so the gaze darts.
+    uint16_t       saccade_ms;
 } eyes_config_t;
 
 void eyes_init(uint32_t seed);
@@ -97,6 +108,14 @@ void eyes_set_squint(bool on);
 
 // Wake-up yawn: squeeze shut, open wide, settle.
 void eyes_yawn(void);
+
+// Power-on: the face comes up with its eyes shut, opens them slowly and lets
+// the pupils snap into focus. Runs for BOOT_SEQUENCE_MS and then hands control
+// back to the normal animation.
+void eyes_boot(uint32_t now_ms);
+bool eyes_booting(void);
+
+#define BOOT_SEQUENCE_MS 1500u
 
 // One-off wink. `eye` 0 = left, 1 = right.
 void eyes_wink(int eye);

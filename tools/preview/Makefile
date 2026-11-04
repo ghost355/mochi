@@ -2,7 +2,9 @@
 #
 #   make            build ./preview
 #   make sheet      build, render, convert to PNG
-#   make check      verify the dirty-rect flush converges (see mirror_test.c)
+#   make check      mirror_test: the flush converges; banner_test: the face
+#                   stays out of the banner page; logic_test: gestures and the
+#                   pomodoro timer
 #   make clean
 
 CC      ?= clang
@@ -30,11 +32,15 @@ mirror_test: mirror_test.c $(SRC)/eyes.c
 banner_test: banner_test.c $(SRC)/eyes.c $(SRC)/display/font5x7.c
 	$(CC) $(CFLAGS) $(INCS) -I$(SRC)/display banner_test.c $(SRC)/eyes.c $(SRC)/display/font5x7.c -o banner_test -lm
 
-check: mirror_test banner_test
+logic_test: logic_test.c $(SRC)/mood.c $(SRC)/focus.c
+	$(CC) $(CFLAGS) $(INCS) logic_test.c $(SRC)/mood.c $(SRC)/focus.c -o logic_test
+
+check: mirror_test banner_test logic_test
 	./mirror_test
 	./banner_test
+	./logic_test
 
 clean:
-	rm -f preview preview.ppm preview.png mirror_test banner_test
+	rm -f preview preview.ppm preview.png mirror_test banner_test logic_test
 
 .PHONY: sheet check clean

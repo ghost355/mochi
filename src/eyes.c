@@ -84,6 +84,13 @@ static eyes_rect_t s_prev;
 // different pair of brows would be skipped and the old ones would stay on the
 // panel — the face would keep wearing the previous expression.
 static uint32_t s_last_cfg_hash;
+
+// Power-on sequence: the face starts shut and opens by itself.
+static bool     s_boot_active;
+static uint32_t s_boot_start;
+static float    s_boot_open;
+// 0 = pupil out of focus, 1 = sharp.
+static float    s_focus = 1.0f;
 static uint32_t    s_now;
 static int         s_last_h_l, s_last_h_r, s_last_cx, s_last_cy;
 static int         s_last_px, s_last_py;
@@ -322,9 +329,12 @@ static void draw_blob(int cx, int cy, int eye, int pct, bool on)
     }
 
     for (int r = 0; r < 7; r++)
-        for (int c = 0; c < 7; c++)
-            if (k_pupil[eye][r][c] == '#')
-                sh1106_set_pixel(cx + c - 3, cy + r - 3, on);
+        for (int c = 0; c < 7; c++) {
+            if (k_pupil[eye][r][c] != '#') continue;
+            int dx = ((c - 3) * pct) / 100;
+            int dy = ((r - 3) * pct) / 100;
+            sh1106_set_pixel(cx + dx, cy + dy, on);
+        }
 }
 
 static void draw_dot(int cx, int cy, int r, bool on)
@@ -365,6 +375,10 @@ static void fill_crescent(int cx, int cy, int rx, int ry, int cut_dy)
 
 static float eye_open_for(int which)
 {
+    // During the power-on the lids are on rails: no blinks, no squint, no
+    // drift — just the opening curve.
+    if (s_boot_active) return s_boot_open;
+
     float open = s_open * s_rest;
 
     if (s_squint && !s_blinking) open *= SQUINT_OPEN;
@@ -411,6 +425,14 @@ static eye_dims_t dims_for(eye_shape_t shape)
         d.w = STAR_EYE_D;
         d.h = STAR_EYE_D;
         d.gap = STAR_GAP;
+    }
+
+    // Scale is a percentage, and 0 means "not set" — every mood that does not
+    // care leaves the field at zero after the memset.
+    int sc = s_cfg.scale;
+    if (sc >= 50 && sc != 100) {
+        d.w = d.w * sc / 100;
+        d.h = d.h * sc / 100;
     }
     return d;
 }
@@ -490,8 +512,20 @@ static void lid_chord(int cx, int cy, int r, float t, int angle_deg)
 // Round face: a fixed circle, a pupil that travels, and a lid that closes.
 static void draw_eye_round(int cx, int cy, int eye, float open)
 {
-    int r = STAR_EYE_D / 2;
+    int r = dims_for(s_cfg.shape).w / 2;
     int thick = STAR_RING;
+
+    // Power-on starts with the eyes genuinely shut. A lid at 94 % leaves a
+    // crescent at the bottom of the circle, which reads as a half-open eye;
+    // a closed cartoon eye is a horizontal line at eye level.
+    if (s_boot_active && s_boot_open <= 0.02f) {
+        int half = r * 3 / 4;
+        for (int x = -half; x <= half; x++) {
+            sh1106_set_pixel(cx + x, cy, true);
+            sh1106_set_pixel(cx + x, cy + 1, true);
+        }
+        return;
+    }
     bool solid = (s_cfg.shape == EYE_SHAPE_STAR_SOLID);
 
     if (solid) {
@@ -522,6 +556,15 @@ static void draw_eye_round(int cx, int cy, int eye, float open)
                : (s_cfg.pupil == PUPIL_DOT)      ? DOT_R
                : (s_cfg.pupil == PUPIL_BLOB)     ? BLOB_CORE_R
                : STAR_R;
+
+    // Panic shrinks the pupil to a pinprick without touching the eye itself.
+    {
+        int ps = s_cfg.pupil_scale;
+        if (ps > 0 && ps != 100) {
+            base_r = base_r * ps / 100;
+            if (base_r < 1) base_r = 1;
+        }
+    }
 
     // How far the lids close this frame: a blink and the mood's resting lid
     // combine, whichever is lower wins.
@@ -557,6 +600,21 @@ static void draw_eye_round(int cx, int cy, int eye, float open)
     // inside the last sliver of sclera and the blink ends in two white wings.
     bool pupil_visible = (t - mood_t) < 0.55f;
 
+    // Out of focus: a soft disc that dithers away as it sharpens. The pupil is
+    // cut out of the sclera (or drawn in), so a checkerboard hole reads as a
+    // blurred pupil rather than as a different shape.
+    if (s_focus < 0.99f) {
+        int br = base_r + (int)(3.5f * (1.0f - s_focus));
+        for (int dy = -br; dy <= br; dy++) {
+            for (int dx = -br; dx <= br; dx++) {
+                if (dx * dx + dy * dy > br * br) continue;
+                if (s_focus < 0.55f && (((dx + dy) & 1) != 0)) continue;
+                sh1106_set_pixel(cx + px + dx, cy + py + dy, !solid);
+            }
+        }
+        goto pupil_done;
+    }
+
     switch (s_cfg.pupil) {
     case PUPIL_ASTERISK:
         if (pupil_visible) draw_asterisk(cx + px, cy + py, base_r, !solid);
@@ -574,6 +632,8 @@ static void draw_eye_round(int cx, int cy, int eye, float open)
         if (pupil_visible) draw_star(cx + px, cy + py, base_r, !solid);
         break;
     }
+
+pupil_done: ;
 
     // Mirror the tilt on the right eye, so an annoyed face is symmetric.
     int angle = (eye == 0) ? s_cfg.lid_angle : -s_cfg.lid_angle;
@@ -687,6 +747,9 @@ void eyes_init(uint32_t seed)
     s_last_ms = 0;
     s_wink = -1;
     s_yawn_active = false;
+    s_boot_active = false;
+    s_boot_open = 1.0f;
+    s_focus = 1.0f;
     s_next_tic = rng_range(6000, 12000);
 
     s_look_x = s_look_y = 0.0f;
@@ -701,6 +764,19 @@ void eyes_init(uint32_t seed)
     s_last_px = s_last_py = -999;
     s_last_open_l = s_last_open_r = -1;
     s_last_shape = -1;
+}
+
+void eyes_boot(uint32_t now_ms)
+{
+    s_boot_active = true;
+    s_boot_start = now_ms;
+    s_boot_open = 0.06f;
+    s_focus = 0.0f;
+}
+
+bool eyes_booting(void)
+{
+    return s_boot_active;
 }
 
 void eyes_blink_now(void)
@@ -755,6 +831,33 @@ void eyes_update(uint32_t now_ms)
     if (dt > 0.2f) dt = 0.2f;      // first frame, or the loop stalled
     s_last_ms = now_ms;
     s_now = now_ms;
+
+    // --- Power-on sequence ---
+    if (s_boot_active) {
+        uint32_t bt = s_now - s_boot_start;
+
+        if (bt >= BOOT_SEQUENCE_MS) {
+            s_boot_active = false;
+            s_focus = 1.0f;
+        } else {
+            // A quarter of a second shut, so the face arrives asleep, then the
+            // lids come up on an ease-out curve.
+            if (bt < 250) {
+                s_boot_open = 0.0f;
+            } else {
+                float u = (float)(bt - 250) / 900.0f;
+                if (u > 1.0f) u = 1.0f;
+                float e = 1.0f - (1.0f - u) * (1.0f - u);
+                s_boot_open = 0.06f + 0.94f * e;
+            }
+
+            // Focus lags the opening and then resolves fast: squared, so the
+            // pupil stays soft for most of the run and snaps in the last third.
+            float f = (bt < 650) ? 0.0f : (float)(bt - 650) / 600.0f;
+            if (f > 1.0f) f = 1.0f;
+            s_focus = f * f;
+        }
+    }
 
     // Resting openness glides toward whatever the mood asked for, so falling
     // asleep and waking up are animations instead of jumps.
@@ -828,7 +931,13 @@ void eyes_update(uint32_t now_ms)
         int i = rng_range(0, NUM_GAZE - 1);
         s_look_x_t = (float)k_gaze[i].x;
         s_look_y_t = (float)k_gaze[i].y;
-        s_next_saccade = now_ms + (uint32_t)rng_range(900, 3200);
+        if (s_cfg.saccade_ms > 0) {
+            int lo = (int)s_cfg.saccade_ms * 7 / 10;
+            int hi = (int)s_cfg.saccade_ms * 13 / 10;
+            s_next_saccade = now_ms + (uint32_t)rng_range(lo, hi);
+        } else {
+            s_next_saccade = now_ms + (uint32_t)rng_range(900, 3200);
+        }
     }
 
     // Eyes snap to a new target quickly; a 0.35 lerp per 30 fps frame lands
@@ -852,6 +961,9 @@ static uint32_t cfg_hash(void)
     MIX(s_cfg.brow_tilt);
     MIX(s_cfg.brow_thick);
     MIX(s_cfg.brow_mono);
+    MIX(s_cfg.scale);
+    MIX(s_cfg.pupil_scale);
+    MIX((int)(s_focus * 100.0f));
     #undef MIX
     return h;
 }
@@ -883,6 +995,15 @@ eyes_rect_t eyes_draw(void)
     int cx_l = (SH1106_WIDTH / 2) - (d.gap / 2) - (w / 2) + gx;
     int cx_r = (SH1106_WIDTH / 2) + (d.gap / 2) + (w / 2) + gx;
     int cy   = (round ? ROUND_EYE_CY : EYE_CY) + gy + drift;
+
+    // A scaled-up face is not allowed to paint into the banner page. Panic
+    // grows the circles until their tops want rows 5-7, which belong to the
+    // text: the ink would sit in the framebuffer and ride out with the next
+    // page-0 flush as dashes above the face.
+    if (round) {
+        int min_cy = EYES_TOP_ROW + d.h / 2;
+        if (cy < min_cy) cy = min_cy;
+    }
 
     int pupil_x = 0, pupil_y = 0;
     if (round) {

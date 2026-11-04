@@ -81,7 +81,8 @@ Two silhouettes, picked at build time in `src/board.h`:
 On the round styles the ring stays put and only the pupil travels, which costs
 a fraction of the bus time a moving eye does. `EYES_PUPIL` picks the pupil:
 `0` sparkle, `1` asterisk, `2` hand-drawn asterisk, `3` plain dot, `4` the
-default: a hand-authored 9x9 asterisk, a different mask on each eye.
+default: a hand-authored 7x7 asterisk, a different mask on each eye. A mood may
+override the pupil (panic shrinks it to a dot) by setting `pupil_scale`.
 
 Expression is carried by two parameters rather than by swapping bitmaps: a
 **lid** (`lid_pct`, `lid_angle`) that closes the circle like an eyelid instead
@@ -94,11 +95,13 @@ two pixels read as a hairline at this size, three read as a brow.
 
 | Mood | Trigger | Face |
 |---|---|---|
-| idle | default | neutral caps, blink every 2-6 s |
+| idle | default | neutral, blink every 2-6 s |
 | curious | one tap | wider eyes, fast gaze, 2.5 s |
 | happy | two taps within 1.2 s | eyes squeezed from below, brows high, 4 s |
-| pleading | three taps within 2 s | brows raised and pinched at the bridge, 4 s |
+| focus | three taps within 2 s | lids low, brows pulled in — and a 25 min timer, see below |
 | annoyed | four taps within 3 s | tilted lids, brows pulled down, 3 s |
+| pleading | five taps within 3 s | brows raised and pinched at the bridge, 4 s |
+| panic | six taps within 3.5 s | face scaled past the screen edge, pinprick pupils, gaze darting every 200 ms, 2.6 s |
 | angry | holding the pad 1.5 s | monobrow, steeper lids, 3.5 s |
 | sleepy | 45 s untouched | half-closed, slow blinks, until tapped |
 
@@ -126,8 +129,24 @@ It used to sit at the bottom, where it chewed into the chin of the eyes during
 a squint; the top row is free, since the brows start at row 10. Erased the
 frame the hand comes off.
 
-**Sound** (passive piezo on GP3, PWM slice, fully non-blocking): startup
-arpeggio, tap chirp, hold drone, release phrase, yawn, goodnight.
+**Boot.** The board does not simply appear: the face comes up asleep, two
+closed lids under two brows, then the lids lift on an ease-out curve while the
+pupils resolve out of a blur — a dithered disc that sharpens into the asterisk
+in the last third of the second — and the arpeggio plays underneath. Touch is
+ignored until the sequence ends.
+
+<p align="center">
+  <img src="docs/boot.gif" width="340" alt="power-on sequence">
+</p>
+
+**Focus mode.** Three taps start a 25-minute pomodoro: the face goes serious,
+a progress bar crawls along the bottom three rows, and the robot stops falling
+asleep. Three taps again cancel it. When the timer runs out the bar clears, the
+face celebrates and the arpeggio plays.
+
+**Sound** (passive piezo on GP3, PWM slice, fully non-blocking): boot arpeggio,
+R2-D2 chatter on every tap, hold drone, release phrase, yawn, goodnight, a belch
+after a two-and-a-half-second grab, and a panicked chirp.
 
 ## Previewing the face without hardware
 

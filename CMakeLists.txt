@@ -16,6 +16,7 @@ add_executable(mochi
     src/main.c
     src/eyes.c
     src/mood.c
+    src/focus.c
     src/touch.c
     src/buzzer.c
     src/display/sh1106.c

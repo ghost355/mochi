@@ -60,6 +60,27 @@ const mood_params_t k_moods[MOOD_COUNT] = {
                   .brow_len = 72, .brow_lift = 4, .brow_tilt = 10, .brow_thick = 3, .brow_mono = 1 },
         .duration_ms = 3500,
     },
+    [MOOD_PANIC] = {
+        .name = "panic",
+        // Eyes shoved up against the glass: the face is scaled past the screen
+        // edges, the pupils shrink to pinpricks and the gaze darts.
+        .eyes = { .open_rest = 1.00f, .gaze_amp = 2.40f,
+                  .shape = EYE_SHAPE_STAR_SOLID, .blink_min_ms = 500, .blink_max_ms = 1200,
+                  .pupil = PUPIL_DOT, .pupil_scale = 40, .scale = 132,
+                  .saccade_ms = 200,
+                  .brow_len = 70, .brow_lift = 12, .brow_tilt = -3, .brow_thick = 3 },
+        .duration_ms = 2600,
+    },
+    [MOOD_FOCUS] = {
+        .name = "focus",
+        // Serious, not angry: brows level and pulled in, lids just low enough
+        // to read as concentration.
+        .eyes = { .open_rest = 1.00f, .gaze_amp = 0.25f,
+                  .shape = EYE_SHAPE_STAR_SOLID, .blink_min_ms = 3000, .blink_max_ms = 6000,
+                  .lid_pct = 16, .lid_angle = 12,
+                  .brow_len = 66, .brow_lift = 1, .brow_tilt = 7, .brow_thick = 3 },
+        .duration_ms = 0,
+    },
     [MOOD_SLEEPY] = {
         .name = "sleepy",
         .eyes = { .open_rest = 1.00f, .gaze_amp = 0.50f,
@@ -109,7 +130,7 @@ static int taps_in_window(uint32_t now, uint32_t window)
     return n;
 }
 
-void mood_tap(uint32_t now_ms)
+int mood_tap(uint32_t now_ms)
 {
     s_taps[s_tap_head] = now_ms;
     s_tap_head = (uint8_t)((s_tap_head + 1) % TAP_RING);
@@ -117,16 +138,25 @@ void mood_tap(uint32_t now_ms)
 
     s_last_touch = now_ms;
 
-    if (taps_in_window(now_ms, 3000) >= 4) {
+    if (taps_in_window(now_ms, 3500) >= 6) {
+        enter(MOOD_PANIC, now_ms);
+        buzzer_chirp(now_ms);
+    } else if (taps_in_window(now_ms, 3000) >= 5) {
+        enter(MOOD_PLEADING, now_ms);
+    } else if (taps_in_window(now_ms, 3000) >= 4) {
         enter(MOOD_ANNOYED, now_ms);
         buzzer_play(&buzzer_sad);
     } else if (taps_in_window(now_ms, 2000) >= 3) {
-        enter(MOOD_PLEADING, now_ms);
+        // Handled by the caller: three taps start the focus timer, which owns
+        // the mood from here.
+        enter(MOOD_FOCUS, now_ms);
     } else if (taps_in_window(now_ms, 1200) >= 2) {
         enter(MOOD_HAPPY, now_ms);
     } else {
         enter(MOOD_CURIOUS, now_ms);
     }
+
+    return taps_in_window(now_ms, 2000);
 }
 
 void mood_hold(uint32_t now_ms)
@@ -142,6 +172,26 @@ void mood_hold_long(uint32_t now_ms)
 }
 
 void mood_release(uint32_t now_ms)
+{
+    s_last_touch = now_ms;
+}
+
+void mood_focus_enter(uint32_t now_ms)
+{
+    enter(MOOD_FOCUS, now_ms);
+}
+
+void mood_focus_leave(uint32_t now_ms)
+{
+    if (s_mood == MOOD_FOCUS) enter(MOOD_IDLE, now_ms);
+}
+
+void mood_celebrate(uint32_t now_ms)
+{
+    enter(MOOD_HAPPY, now_ms);
+}
+
+void mood_keep_awake(uint32_t now_ms)
 {
     s_last_touch = now_ms;
 }

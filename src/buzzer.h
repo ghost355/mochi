@@ -37,6 +37,14 @@ void buzzer_play(const buzzer_melody_t *melody);
 // Hold a single tone for `ms` (used for the long press drone).
 void buzzer_tone(uint16_t freq, uint32_t ms);
 
+// R2-D2 style chatter: 5-7 off-scale blips, one of four variants picked at
+// random. Interrupts whatever is playing.
+void buzzer_chirp(uint32_t now_ms);
+
+// Rick-style belch: a burst of low pulses whose duty cycle swings 20-60 %
+// on every pulse. Interrupts whatever is playing.
+void buzzer_burp(uint32_t now_ms);
+
 void buzzer_stop(void);
 bool buzzer_busy(void);
 
