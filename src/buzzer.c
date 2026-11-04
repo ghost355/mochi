@@ -48,6 +48,11 @@ static uint8_t             s_burst_count;
 static uint8_t             s_burst_index;
 static uint32_t            s_burst_next_at;
 
+// A melody to start the moment the burst ends. A belch followed by a goodnight
+// phrase is one gesture, not two: without this the second call would cut the
+// first one off.
+static const buzzer_melody_t *s_burst_then;
+
 // Scratch table the burp is assembled into before playback.
 static burst_note_t s_burp_steps[14 * 2 - 1];  // worst case: 14 pulses + 13 gaps
 
@@ -197,6 +202,7 @@ void buzzer_init(void)
     s_notes = NULL;
     s_tone_until = 0;
     s_burst = NULL;
+    s_burst_then = NULL;
 }
 
 void buzzer_play(const buzzer_melody_t *melody)
@@ -209,6 +215,7 @@ void buzzer_play(const buzzer_melody_t *melody)
     s_next_at = 0;       // fire on the next update
     s_tone_until = 0;
     s_burst = NULL;
+    s_burst_then = NULL;
 }
 
 void buzzer_tone(uint16_t freq, uint32_t ms)
@@ -224,6 +231,7 @@ void buzzer_stop(void)
     s_notes = NULL;
     s_tone_until = 0;
     s_burst = NULL;
+    s_burst_then = NULL;
     set_freq(0);
 }
 
@@ -241,6 +249,10 @@ void buzzer_update(uint32_t now_ms)
             if (s_burst_index >= s_burst_count) {
                 s_burst = NULL;
                 set_freq_duty(0, 50);
+
+                const buzzer_melody_t *then = s_burst_then;
+                s_burst_then = NULL;
+                if (then) buzzer_play(then);
             } else {
                 const burst_note_t *n = &s_burst[s_burst_index++];
                 set_freq_duty(n->freq, n->duty);
@@ -351,4 +363,10 @@ void buzzer_burp(uint32_t now_ms)
 {
     rng_seed(now_ms);
     burst_start(s_burp_steps, build_burp());
+}
+
+void buzzer_burp_then(uint32_t now_ms, const buzzer_melody_t *then)
+{
+    buzzer_burp(now_ms);
+    s_burst_then = then;
 }

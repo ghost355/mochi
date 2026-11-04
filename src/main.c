@@ -201,7 +201,6 @@ int main(void)
     int updates = 0;
     bool s_squinting = false;
     bool s_grabbed   = false;
-    bool s_burped    = false;
     bool warn_shown = false;
     uint32_t last_held = 0;
     mood_t prev_mood = MOOD_IDLE;
@@ -248,11 +247,6 @@ int main(void)
             mood_hold_long(now);
             printf("touch: grab %.1fs\n", (double)ts.held_ms / 1000.0);
         }
-        if (ts.pressed && ts.held_ms >= 2500 && !s_burped) {
-            s_burped = true;
-            buzzer_burp(now);
-            printf("sound: burp\n");
-        }
         if (ts.pressed && ts.held_ms >= 700 && !s_squinting) {
             s_squinting = true;
             eyes_set_squint(true);
@@ -263,7 +257,6 @@ int main(void)
         if (ts.just_released) {
             if (s_squinting) { s_squinting = false; eyes_set_squint(false); }
             s_grabbed = false;
-            s_burped  = false;
             eyes_blink_now();
             buzzer_stop();
             buzzer_play(&buzzer_release);
@@ -309,7 +302,9 @@ int main(void)
                 buzzer_play(&buzzer_yawn);
                 printf("wake: yawn\n");
             } else if (m == MOOD_SLEEPY) {
-                buzzer_play(&buzzer_sleep);
+                // A belch, then the goodnight phrase over the closing lids.
+                buzzer_burp_then(now, &buzzer_sleep);
+                printf("sound: burp + goodnight\n");
             }
             prev_mood = m;
         }

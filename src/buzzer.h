@@ -45,6 +45,10 @@ void buzzer_chirp(uint32_t now_ms);
 // on every pulse. Interrupts whatever is playing.
 void buzzer_burp(uint32_t now_ms);
 
+// A belch that hands over to a melody when it ends — the goodnight phrase
+// follows the burp instead of cutting it off.
+void buzzer_burp_then(uint32_t now_ms, const buzzer_melody_t *then);
+
 void buzzer_stop(void);
 bool buzzer_busy(void);
 

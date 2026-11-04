@@ -116,7 +116,8 @@ happy face still blinks correctly.
   over about a second instead of snapping shut
 - waking up triggers a yawn (squeeze shut, throw wide, settle) with a low
   falling phrase
-- falling asleep plays a two-note goodnight
+- falling asleep starts with a belch and ends with a two-note goodnight: it
+  burps, then the lids come down over the phrase
 - every 7-16 s the face performs an involuntary gesture: a wink, or a sudden
   glance elsewhere
 
@@ -145,8 +146,9 @@ asleep. Three taps again cancel it. When the timer runs out the bar clears, the
 face celebrates and the arpeggio plays.
 
 **Sound** (passive piezo on GP3, PWM slice, fully non-blocking): boot arpeggio,
-R2-D2 chatter on every tap, hold drone, release phrase, yawn, goodnight, a belch
-after a two-and-a-half-second grab, and a panicked chirp.
+R2-D2 chatter on every tap, hold drone, release phrase, yawn, and a panicked
+chirp. The belch belongs to falling asleep — it fires first and hands the
+buzzer over to the goodnight phrase when it ends.
 
 ## Previewing the face without hardware
 
