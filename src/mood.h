@@ -8,6 +8,7 @@
  *   CURIOUS   one tap, lasts 2.5 s
  *   HAPPY     two taps within 1.2 s, lasts 4 s
  *   ANNOYED   four taps within 3 s, lasts 3 s
+ *   ANGRY     holding the pad for 1.5 s, lasts 3.5 s
  *   SLEEPY    45 s without a touch, until the next tap
  *
  * Each mood carries the parameters the eye engine needs (blink rate, saccade
@@ -28,6 +29,7 @@ typedef enum {
     MOOD_CURIOUS,
     MOOD_HAPPY,
     MOOD_ANNOYED,
+    MOOD_ANGRY,
     MOOD_SLEEPY,
     MOOD_COUNT,
 } mood_t;
@@ -42,6 +44,9 @@ void mood_init(uint32_t now_ms);
 
 void mood_tap(uint32_t now_ms);
 void mood_hold(uint32_t now_ms);
+
+// The touch has been held long enough to be a grab rather than a tap.
+void mood_hold_long(uint32_t now_ms);
 void mood_release(uint32_t now_ms);
 
 // Advance timers. Returns the new mood if it changed since the last call.

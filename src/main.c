@@ -94,8 +94,35 @@ static void draw_boot_screen(int addr)
     sh1106_flush();
 }
 
-// --- Hold warning ---------------------------------------------------------
+// --- Eye style ------------------------------------------------------------
 
+// The moods describe expression (openness, blink rate, gaze). The build-time
+// style decides the silhouette: capsule bars, or round eyes with a star pupil.
+static void apply_eye_style(eyes_config_t *cfg)
+{
+#if EYES_STYLE == 1
+    cfg->shape = EYE_SHAPE_STAR_RING;
+#elif EYES_STYLE == 2
+    cfg->shape = EYE_SHAPE_STAR_SOLID;
+#else
+    (void)cfg;
+    return;
+#endif
+
+#if   EYES_PUPIL == 1
+    cfg->pupil = PUPIL_ASTERISK;
+#elif EYES_PUPIL == 2
+    cfg->pupil = PUPIL_SCRIBBLE;
+#elif EYES_PUPIL == 3
+    cfg->pupil = PUPIL_DOT;
+#elif EYES_PUPIL == 4
+    cfg->pupil = PUPIL_BLOB;
+#else
+    cfg->pupil = PUPIL_ASTROID;
+#endif
+}
+
+// --- Hold warning ---------------------------------------------------------
 // Draw the banner into the framebuffer. Kept separate from the flush so the
 // caller can decide whether the band actually has to go over I2C.
 static void warn_render(void)
@@ -149,7 +176,11 @@ int main(void)
     touch_init();
     buzzer_init();
     mood_init((uint32_t)to_ms_since_boot(get_absolute_time()));
-    eyes_set_config(&mood_params(MOOD_IDLE)->eyes);
+    {
+        eyes_config_t cfg = mood_params(MOOD_IDLE)->eyes;
+        apply_eye_style(&cfg);
+        eyes_set_config(&cfg);
+    }
     buzzer_play(&buzzer_startup);
 
     const uint32_t frame_us = 1000000 / FPS_TARGET;
@@ -159,6 +190,7 @@ int main(void)
     int frames = 0;
     int updates = 0;
     bool s_squinting = false;
+    bool s_grabbed   = false;
     bool warn_shown = false;
     uint32_t last_held = 0;
     mood_t prev_mood = MOOD_IDLE;
@@ -178,6 +210,11 @@ int main(void)
             mood_tap(now);
             printf("touch: tap\n");
         }
+        if (ts.pressed && ts.held_ms >= 1500 && !s_grabbed) {
+            s_grabbed = true;
+            mood_hold_long(now);
+            printf("touch: grab %.1fs\n", (double)ts.held_ms / 1000.0);
+        }
         if (ts.pressed && ts.held_ms >= 700 && !s_squinting) {
             s_squinting = true;
             eyes_set_squint(true);
@@ -187,6 +224,7 @@ int main(void)
         }
         if (ts.just_released) {
             if (s_squinting) { s_squinting = false; eyes_set_squint(false); }
+            s_grabbed = false;
             eyes_blink_now();
             buzzer_stop();
             buzzer_play(&buzzer_release);
@@ -196,7 +234,9 @@ int main(void)
 
         mood_t m;
         if (mood_update(now, &m)) {
-            eyes_set_config(&mood_params(m)->eyes);
+            eyes_config_t cfg = mood_params(m)->eyes;
+            apply_eye_style(&cfg);
+            eyes_set_config(&cfg);
             printf("mood: %s\n", mood_params(m)->name);
 
             if (prev_mood == MOOD_SLEEPY && m != MOOD_SLEEPY) {

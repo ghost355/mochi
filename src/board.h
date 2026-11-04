@@ -27,4 +27,21 @@
 #define PIN_TOUCH     2       // TTP223 touch sensor output
 #define PIN_BUZZER    3       // passive buzzer + (PWM slice 1B)
 
+// --- Eye style ------------------------------------------------------------
+// Which face the mood engine draws. The moods still drive openness, blink
+// rate and gaze; this only picks the silhouette.
+//
+//   0  capsule bars   — the original face, cheapest on I2C
+//   1  round ring     — big circles drawn as outlines, star pupil inside
+//   2  round filled   — big circles filled, pupil cut out as a hole
+//
+// In the round styles the rings stay put and only the pupils travel, which
+// costs a lot less bus time than moving the whole eye.
+#define EYES_STYLE       2
+
+// Pupil shape for the round styles:
+//   0 = four-point sparkle   1 = symmetric asterisk
+//   2 = hand-drawn asterisk  3 = plain dot  4 = blob with spikes
+#define EYES_PUPIL       4
+
 #endif // MOCHI_BOARD_H

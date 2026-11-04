@@ -39,6 +39,18 @@
 
 #define NUM_GAZE     8
 
+// Round style: two big rings with a star pupil that travels inside them.
+#define STAR_EYE_D   44
+#define ROUND_EYE_CY 36
+#define STAR_R       5
+#define ASTERISK_R   4
+#define SCRIBBLE_R       6
+#define DOT_R            3
+#define BLOB_CORE_R      4
+#define STAR_GAP     8
+#define STAR_RING    2
+#define STAR_PUPIL_GAIN 1.3f
+
 static const struct {
     int x, y;
 } k_gaze[NUM_GAZE] = {
@@ -63,6 +75,9 @@ static uint32_t s_next_saccade;
 static eyes_rect_t s_prev;
 static uint32_t    s_now;
 static int         s_last_h_l, s_last_h_r, s_last_cx, s_last_cy;
+static int         s_last_px, s_last_py;
+static int         s_last_open_l, s_last_open_r;
+
 static int         s_last_shape;
 
 static eyes_config_t s_cfg = {
@@ -159,6 +174,143 @@ static int ellipse_halfwidth(int rx, int ry, int dy)
     return (int)((float)rx * sqrtf(s) + 0.5f);
 }
 
+// Filled ellipse, optionally turning pixels off instead of on. Used by the
+// round eye style: a ring is an outer ellipse with the inner one cleared.
+static void fill_ellipse_ex(int cx, int cy, int rx, int ry, bool on)
+{
+    if (rx < 0 || ry < 0) return;
+    for (int dy = -ry; dy <= ry; dy++) {
+        int dx = ellipse_halfwidth(rx, ry, dy);
+        if (dx < 0) continue;
+        for (int x = cx - dx; x <= cx + dx; x++)
+            sh1106_set_pixel(x, cy + dy, on);
+    }
+}
+
+// Four-point sparkle: the astroid |x|^(2/3) + |y|^(2/3) = r^(2/3). At 6 px
+// across it reads as a star, and it stays clean without anti-aliasing because
+// the shape is concave everywhere.
+static bool star_hit(int dx, int dy, int r)
+{
+    if (dx == 0 && dy == 0) return true;
+    if (r <= 0) return false;
+
+    float ax = cbrtf(fabsf((float)dx) / (float)r);
+    float ay = cbrtf(fabsf((float)dy) / (float)r);
+    return ax * ax + ay * ay <= 1.0f;
+}
+
+static void draw_star(int cx, int cy, int r, bool on)
+{
+    for (int dy = -r; dy <= r; dy++)
+        for (int dx = -r; dx <= r; dx++)
+            if (star_hit(dx, dy, r))
+                sh1106_set_pixel(cx + dx, cy + dy, on);
+}
+
+// Eight-spoke asterisk: one pixel thick along the axes and the diagonals.
+// At r = 5 that is 21 lit pixels — small enough to read as a pupil, spiky
+// enough to read as an asterisk.
+static void draw_asterisk(int cx, int cy, int r, bool on)
+{
+    for (int dy = -r; dy <= r; dy++) {
+        for (int dx = -r; dx <= r; dx++) {
+            int ax = dx < 0 ? -dx : dx;
+            int ay = dy < 0 ? -dy : dy;
+
+            if ((ay == 0 && ax <= r) || (ax == 0 && ay <= r) ||
+                (ax == ay && ax <= r))
+                sh1106_set_pixel(cx + dx, cy + dy, on);
+        }
+    }
+}
+
+// A quick pen asterisk: strokes fan out from a jittered centre, each with its
+// own length and angle. `pct` scales it down as the eyelid closes.
+// Two hand-drawn pupils, authored as pixel masks rather than generated from
+// random angles: at 9 px a generator produces noise, a human produces a mark
+// that reads as an asterisk. The two eyes use different masks on purpose.
+static const char *const k_scrib[2][9] = {
+    {   // left: full six arms, top arm a touch short
+        "....#....",
+        "....#....",
+        ".#..#..#.",
+        "..#.#.#..",
+        "....#....",
+        "...#.#...",
+        "..#.#.#..",
+        ".#..#..#.",
+        "....#....",
+    },
+    {   // right: thicker core, arms pushed off the axes
+        "....#....",
+        "....#...#",
+        ".#...#..#",
+        "..#..#...",
+        "....##...",
+        "..##.#...",
+        ".#..#.#..",
+        "..#...#..",
+        ".....#...",
+    },
+};
+
+static void draw_scribble(int cx, int cy, int eye, int pct, bool on)
+{
+    if (pct < 55) {                      // eyelid nearly shut: a speck is enough
+        sh1106_set_pixel(cx, cy, on);
+        sh1106_set_pixel(cx + 1, cy, on);
+        return;
+    }
+
+    for (int r = 0; r < 9; r++) {
+        for (int c = 0; c < 9; c++) {
+            if (k_scrib[eye][r][c] != '#') continue;
+            int dx = ((c - 4) * pct) / 100;
+            int dy = ((r - 4) * pct) / 100;
+            sh1106_set_pixel(cx + dx, cy + dy, on);
+        }
+    }
+}
+
+static void draw_dot(int cx, int cy, int r, bool on);
+
+// A fat disc with short spikes: the pupil reads as a blob of ink with a few
+// bristles, not as a star. Cardinals get a longer tail than diagonals, and the
+// two eyes are offset by one step so they never look stamped from a symbol.
+static void draw_blob(int cx, int cy, int eye, int pct, bool on)
+{
+    int core = (BLOB_CORE_R * pct) / 100;
+    if (core < 1) core = 1;
+
+    draw_dot(cx, cy, core, on);
+
+    static const int8_t dx[8] = { 0, 1, 1, 1, 0, -1, -1, -1 };
+    static const int8_t dy[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
+
+    for (int i = 0; i < 8; i++) {
+        int k = (i + eye) & 7;
+        bool cardinal = (dx[k] == 0 || dy[k] == 0);
+        int len = core + (cardinal ? 2 : 1);
+
+        if (pct < 70) len = core;      // the eyelid takes the tails first
+
+        for (int r = core + 1; r <= len; r++)
+            sh1106_set_pixel(cx + dx[k] * r, cy + dy[k] * r, on);
+    }
+}
+
+static void draw_dot(int cx, int cy, int r, bool on)
+{
+    if (r < 1) r = 1;
+    for (int dy = -r; dy <= r; dy++) {
+        int dx = ellipse_halfwidth(r, r, dy);
+        if (dx < 0) continue;
+        for (int x = cx - dx; x <= cx + dx; x++)
+            sh1106_set_pixel(x, cy + dy, on);
+    }
+}
+
 // Crescent: an ellipse minus a slightly smaller ellipse shifted by `cut_dy`.
 // A cut ellipse above the eye leaves the lower arc (a smile); below leaves a
 // frown. Scaling with `ry` means a happy face still blinks properly.
@@ -214,16 +366,233 @@ static float eye_open_for(int which)
     return open;
 }
 
-static int eye_h_for(int which)
+// Per-style face geometry: the capsule face is a pair of tall bars, the round
+// face is a pair of big circles, so they need different sizes and gaps.
+typedef struct {
+    int w, h, gap;
+} eye_dims_t;
+
+static bool star_style(void)
 {
-    int h = (int)((float)EYE_H * eye_open_for(which) + 0.5f);
+    return s_cfg.shape == EYE_SHAPE_STAR_RING || s_cfg.shape == EYE_SHAPE_STAR_SOLID;
+}
+
+static eye_dims_t dims_for(eye_shape_t shape)
+{
+    eye_dims_t d = { EYE_W, EYE_H, EYE_GAP };
+    if (shape == EYE_SHAPE_STAR_RING || shape == EYE_SHAPE_STAR_SOLID) {
+        d.w = STAR_EYE_D;
+        d.h = STAR_EYE_D;
+        d.gap = STAR_GAP;
+    }
+    return d;
+}
+
+static int clamp_int(int v, int lo, int hi)
+{
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+}
+
+static int eye_h_for(int which, int base_h)
+{
+    int h = (int)((float)base_h * eye_open_for(which) + 0.5f);
     if (h < BLINK_MIN_H) h = BLINK_MIN_H;
     return h;
 }
 
-// One eye, at its own height, in whichever silhouette the mood selected.
-static void draw_eye(int cx, int cy, int w, int h)
+// Straight lid across a round eye. Everything on the "above" side of the line
+// is erased, so the eye keeps its circular outline and closes like an eyelid
+// instead of squashing into an ellipse.
+static void apply_lid(int cx, int cy, int r, float t, int angle_deg)
 {
+    if (t <= 0.0f) return;
+
+    float a  = (float)angle_deg * (PI_F / 180.0f);
+    float sa = sinf(a);
+    float ca = cosf(a);
+    // `t` is the fraction of the eye the lid covers, so the line sits at
+    // 2t-1 radii down from the centre: t=0 is the top edge, t=1 the bottom.
+    float s = (2.0f * t - 1.0f) * (float)r;
+
+    // Erase the whole bounding square above the lid, not just the inside of
+    // the circle: the outline is rasterised with rounding that pushes a few
+    // pixels outside the mathematical circle, and those survive a clipped
+    // erase as stray slivers along the top of the eye.
+    for (int y = -r; y <= r; y++) {
+        for (int x = -r; x <= r; x++) {
+            if (-sa * (float)x + ca * (float)y < s)
+                sh1106_set_pixel(cx + x, cy + y, false);
+        }
+    }
+}
+
+// The chord where the lid meets the eyeball. Only the outlined eye needs it:
+// on a filled eye the white/black boundary already draws the lid.
+static void lid_chord(int cx, int cy, int r, float t, int angle_deg)
+{
+    float a  = (float)angle_deg * (PI_F / 180.0f);
+    float sa = sinf(a);
+    float ca = cosf(a);
+    float s  = (2.0f * t - 1.0f) * (float)r;
+
+    for (int x = -r; x <= r; x++) {
+        // solve -sa*x + ca*y = s for y
+        if (fabsf(ca) < 1e-4f) continue;
+        float y = (s + sa * (float)x) / ca;
+        if (y < -(float)r || y > (float)r) continue;
+        if ((float)x * (float)x + y * y > (float)(r * r)) continue;
+        sh1106_set_pixel(cx + x, cy + (int)(y + (y < 0 ? -0.5f : 0.5f)), true);
+    }
+}
+
+// Round face: a fixed circle, a pupil that travels, and a lid that closes.
+static void draw_eye_round(int cx, int cy, int eye, float open)
+{
+    int r = STAR_EYE_D / 2;
+    int thick = STAR_RING;
+    bool solid = (s_cfg.shape == EYE_SHAPE_STAR_SOLID);
+
+    if (solid) {
+        fill_ellipse_ex(cx, cy, r, r, true);
+    } else {
+        // Row-scan ring: both edges rounded the same way, so the outline is
+        // continuous instead of notched where the two approximations disagree.
+        int ri = r - thick;
+        for (int dy = -r; dy <= r; dy++) {
+            float ty = (float)dy / (float)r;
+            float out = 1.0f - ty * ty;
+            if (out < 0.0f) continue;
+            int xo = (int)((float)r * sqrtf(out) + 0.5f);
+
+            float tyi = ri > 0 ? (float)dy / (float)ri : 2.0f;
+            float in = 1.0f - tyi * tyi;
+            int xi = (ri > 0 && in > 0.0f) ? (int)((float)ri * sqrtf(in) + 0.5f) : -1;
+
+            for (int x = xi + 1; x <= xo; x++) {
+                sh1106_set_pixel(cx + x, cy + dy, true);
+                if (x != 0) sh1106_set_pixel(cx - x, cy + dy, true);
+            }
+        }
+    }
+
+    int base_r = (s_cfg.pupil == PUPIL_ASTERISK) ? ASTERISK_R
+               : (s_cfg.pupil == PUPIL_SCRIBBLE) ? SCRIBBLE_R
+               : (s_cfg.pupil == PUPIL_DOT)      ? DOT_R
+               : (s_cfg.pupil == PUPIL_BLOB)     ? BLOB_CORE_R
+               : STAR_R;
+
+    // How far the lid comes down this frame: a blink and the mood's resting
+    // lid combine, whichever is lower wins.
+    float t = 1.0f - open;
+    float mood_t = (float)s_cfg.lid_pct / 100.0f;
+    if (mood_t > t) t = mood_t;
+
+    int max_x = clamp_int(r - base_r - thick - 1, 0, r);
+    int max_y = clamp_int(r - base_r - thick - 1, 0, r);
+    int px = clamp_int((int)(s_look_x * s_cfg.gaze_amp * STAR_PUPIL_GAIN), -max_x, max_x);
+    int py = clamp_int((int)(s_look_y * s_cfg.gaze_amp * STAR_PUPIL_GAIN), -max_y, max_y);
+
+    // A heavy lid pushes the pupil down: a half-shut eye looks down, and the
+    // pupil would otherwise be sliced in half by its own eyelid.
+    if (t > 0.30f) {
+        int shift = (int)((t - 0.30f) * (float)r * 0.9f);
+        py += shift;
+        if (py > max_y) py = max_y;
+    }
+
+    switch (s_cfg.pupil) {
+    case PUPIL_ASTERISK:
+        draw_asterisk(cx + px, cy + py, base_r, !solid);
+        break;
+    case PUPIL_SCRIBBLE:
+        draw_scribble(cx + px, cy + py, eye, 100, !solid);
+        break;
+    case PUPIL_DOT:
+        draw_dot(cx + px, cy + py, base_r, !solid);
+        break;
+    case PUPIL_BLOB:
+        draw_blob(cx + px, cy + py, eye, 100, !solid);
+        break;
+    default:
+        draw_star(cx + px, cy + py, base_r, !solid);
+        break;
+    }
+
+    // Mirror the tilt on the right eye, so an annoyed face is symmetric.
+    int angle = (eye == 0) ? s_cfg.lid_angle : -s_cfg.lid_angle;
+    apply_lid(cx, cy, r, t, angle);
+    if (!solid && t > 0.0f) lid_chord(cx, cy, r, t, angle);
+}
+
+// One brow: a shallow arc, two pixels thick. The thickness is drawn as a
+// vertical span per column rather than two offset lines, otherwise the arc
+// steps between rows and the brow comes out dashed.
+static void draw_brow(int x0, int y0, int x1, int y1)
+{
+    int dx = x1 - x0;
+    int n  = dx < 0 ? -dx : dx;
+    if (n == 0) {
+        sh1106_set_pixel(x0, y0, true);
+        sh1106_set_pixel(x0, y0 - 1, true);
+        return;
+    }
+
+    int prev_y = y0;
+
+    for (int i = 0; i <= n; i++) {
+        // Straight, not arched: a 1 px bow is invisible at this resolution but
+        // it does eat into the thickness and makes the brow read as dashed.
+        float t = (float)i / (float)n;
+        int x = x0 + (dx * i) / n;
+        int y = (int)lrintf((float)y0 + (float)(y1 - y0) * t);
+
+        // Bridge the step from the previous column, otherwise a tilted brow
+        // breaks into short dashes wherever it changes row.
+        int lo = y < prev_y ? y : prev_y;
+        int hi = (y < prev_y ? prev_y : y) + 1;
+        for (int yy = lo; yy <= hi; yy++)
+            sh1106_set_pixel(x, yy, true);
+
+        prev_y = y;
+    }
+}
+
+static void draw_brows(int cx_l, int cx_r, int cy, int r)
+{
+    if (s_cfg.brow_len <= 0) return;
+
+    int half = (r * s_cfg.brow_len) / 100;
+    int top  = cy - r - s_cfg.brow_lift;
+
+    if (s_cfg.brow_mono) {
+        // One line from the outer end of the left eye to the outer end of the
+        // right one; the middle rides over the bridge lower than the ends.
+        int x0 = cx_l - half, x1 = cx_r + half;
+        int y  = top + s_cfg.brow_tilt / 2;
+        draw_brow(x0, y, (cx_l + cx_r) / 2, y + s_cfg.brow_tilt);
+        draw_brow((cx_l + cx_r) / 2, y + s_cfg.brow_tilt, x1, y);
+        return;
+    }
+
+    // Left brow: outer end on the left, inner end (towards the nose) on the
+    // right. The right brow mirrors it.
+    draw_brow(cx_l - half, top, cx_l + half, top + s_cfg.brow_tilt);
+    draw_brow(cx_r + half, top, cx_r - half, top + s_cfg.brow_tilt);
+}
+
+// One eye, at its own height, in whichever silhouette the mood selected.
+static void draw_eye(int cx, int cy, int w, int h, int eye, float open)
+{
+    if (star_style()) {
+        draw_eye_round(cx, cy, eye, open);
+        return;
+    }
+
+    (void)eye;
+    (void)open;
+
     if (s_cfg.shape == EYE_SHAPE_CAPSULE || h < 10) {
         fill_capsule(cx, cy, w, h);
     } else if (s_cfg.shape == EYE_SHAPE_HAPPY) {
@@ -267,6 +636,8 @@ void eyes_init(uint32_t seed)
 
     memset(&s_prev, 0, sizeof(s_prev));
     s_last_h_l = s_last_h_r = s_last_cx = s_last_cy = -1;
+    s_last_px = s_last_py = -999;
+    s_last_open_l = s_last_open_r = -1;
     s_last_shape = -1;
 }
 
@@ -291,6 +662,13 @@ void eyes_wink(int eye)
 {
     s_wink = (eye != 0);
     s_wink_at = s_now;
+}
+
+void eyes_glance(float x, float y)
+{
+    s_look_x_t = x;
+    s_look_y_t = y;
+    s_next_saccade = s_now + 3000;
 }
 
 void eyes_set_squint(bool on)
@@ -399,24 +777,49 @@ void eyes_update(uint32_t now_ms)
 
 eyes_rect_t eyes_draw(void)
 {
-    int h_l = eye_h_for(0);
-    int h_r = eye_h_for(1);
-    int h   = h_l > h_r ? h_l : h_r;   // for the dirty rect
-    int w = EYE_W;
+    eye_dims_t d = dims_for(s_cfg.shape);
+    bool round = star_style();
+
+    float open_l = eye_open_for(0);
+    float open_r = eye_open_for(1);
+
+    // The capsule face changes its height to blink; the round face keeps a
+    // fixed circle and closes a lid over it instead, so its bounds never move.
+    int h_l = round ? d.h : eye_h_for(0, d.h);
+    int h_r = round ? d.h : eye_h_for(1, d.h);
+    int h   = h_l > h_r ? h_l : h_r;
+    int w = d.w;
 
     // Slow vertical bob: ~1.5 px of travel with a 4 s period, so the face
     // never looks frozen even when the gaze is still.
     int drift = (int)(1.5f * sinf((float)s_now * 0.0016f));
 
-    int cx_l = (SH1106_WIDTH / 2) - (EYE_GAP / 2) - (w / 2) + (int)(s_look_x * s_cfg.gaze_amp);
-    int cx_r = (SH1106_WIDTH / 2) + (EYE_GAP / 2) + (w / 2) + (int)(s_look_x * s_cfg.gaze_amp);
-    int cy   = EYE_CY + (int)(s_look_y * s_cfg.gaze_amp) + drift;
+    // On the round face the rings stay put and only the pupils travel, so the
+    // gaze must not move the eye centres.
+    int gx = round ? 0 : (int)(s_look_x * s_cfg.gaze_amp);
+    int gy = round ? 0 : (int)(s_look_y * s_cfg.gaze_amp);
+
+    int cx_l = (SH1106_WIDTH / 2) - (d.gap / 2) - (w / 2) + gx;
+    int cx_r = (SH1106_WIDTH / 2) + (d.gap / 2) + (w / 2) + gx;
+    int cy   = (round ? ROUND_EYE_CY : EYE_CY) + gy + drift;
+
+    int pupil_x = 0, pupil_y = 0;
+    if (round) {
+        pupil_x = (int)(s_look_x * s_cfg.gaze_amp * STAR_PUPIL_GAIN);
+        pupil_y = (int)(s_look_y * s_cfg.gaze_amp * STAR_PUPIL_GAIN);
+    }
+
+    // Quantised so a sub-pixel drift does not count as a change.
+    int open_l_q = (int)(open_l * 100.0f);
+    int open_r_q = (int)(open_r * 100.0f);
 
     // Nothing moved since the last frame: the framebuffer already holds this
     // exact image, so skip both the redraw and the I2C transfer. Most frames
     // between blinks and saccades land here, which keeps the bus quiet.
     if (s_prev.w > 0 && h_l == s_last_h_l && h_r == s_last_h_r &&
         cx_l == s_last_cx && cy == s_last_cy &&
+        pupil_x == s_last_px && pupil_y == s_last_py &&
+        open_l_q == s_last_open_l && open_r_q == s_last_open_r &&
         (int)s_cfg.shape == s_last_shape) {
         eyes_rect_t none = { 0, 0, 0, 0 };
         return none;
@@ -435,8 +838,10 @@ eyes_rect_t eyes_draw(void)
                 sh1106_set_pixel(x, y, false);
     }
 
-    draw_eye(cx_l, cy, w, h_l);
-    draw_eye(cx_r, cy, w, h_r);
+    draw_eye(cx_l, cy, w, h_l, 0, open_l);
+    draw_eye(cx_r, cy, w, h_r, 1, open_r);
+
+    if (round) draw_brows(cx_l, cx_r, cy, w / 2);
 
     // Dirty rect: union of what was cleared and what was just drawn.
     eyes_rect_t r;
@@ -466,6 +871,10 @@ eyes_rect_t eyes_draw(void)
     s_last_h_r = h_r;
     s_last_cx = cx_l;
     s_last_cy = cy;
+    s_last_px = pupil_x;
+    s_last_py = pupil_y;
+    s_last_open_l = open_l_q;
+    s_last_open_r = open_r_q;
     s_last_shape = (int)s_cfg.shape;
     return r;
 }

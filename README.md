@@ -55,12 +55,33 @@ buzzer (coil, tens of ohms) would need an NPN/MOSFET driver and a flyback diode.
 
 ## What it does
 
-**Face.** Two capsule eyes drawn parametrically:
+**Face.** Two eyes, drawn parametrically — no frame arrays, no assets:
+
+![face](docs/face.gif)
 
 - blink every 2-6 s (130 ms, smooth close/open curve, occasional double blink)
 - saccades: the gaze jumps to a new offset every 1-3 s and eases there in ~100 ms
 - slow vertical drift so the face never looks frozen
 - per-eye control, so one eyelid can move while the other stays open
+
+Two silhouettes, picked at build time in `src/board.h`:
+
+| `EYES_STYLE` | Look | Pixels per frame |
+|---|---|---|
+| 0 | capsule bars (the first face) | ~1600 |
+| 1 | big circles, drawn as outlines | ~400 |
+| 2 | big circles, filled | ~3900 |
+
+On the round styles the ring stays put and only the pupil travels, which costs
+a fraction of the bus time a moving eye does. `EYES_PUPIL` picks the pupil:
+`0` sparkle, `1` asterisk, `2` hand-drawn asterisk, `3` plain dot, `4` fat blob
+with short spikes poking out.
+
+Expression is carried by two parameters rather than by swapping bitmaps: a
+**lid** (`lid_pct`, `lid_angle`) that closes the circle like an eyelid instead
+of squashing it into an ellipse, and **brows** (`brow_len`, `brow_lift`,
+`brow_tilt`, `brow_mono`) drawn as a 2 px line, mirrored per eye, optionally
+joined into a monobrow.
 
 **Moods**, driven purely by touch:
 
@@ -69,7 +90,8 @@ buzzer (coil, tens of ohms) would need an NPN/MOSFET driver and a flyback diode.
 | idle | default | neutral caps, blink every 2-6 s |
 | curious | one tap | wider eyes, fast gaze, 2.5 s |
 | happy | two taps within 1.2 s | smile-arc eyes, 4 s |
-| annoyed | four taps within 3 s | narrow slits, fast blinking, 3 s |
+| annoyed | four taps within 3 s | tilted lids, brows pulled down, 3 s |
+| angry | holding the pad 1.5 s | monobrow, steeper lids, 3.5 s |
 | sleepy | 45 s untouched | half-closed, slow blinks, until tapped |
 
 The mood supplies eye parameters (openness, blink rate, saccade amplitude,
@@ -97,6 +119,21 @@ always wins, and erased the frame the hand comes off.
 
 **Sound** (passive piezo on GP3, PWM slice, fully non-blocking): startup
 arpeggio, tap chirp, hold drone, release phrase, yawn, goodnight.
+
+## Previewing the face without hardware
+
+`tools/preview/` compiles the real eye engine on the host against a stub that
+swallows pixels instead of pushing them over I2C:
+
+```
+cd tools/preview
+make sheet        # -> preview.png, a contact sheet of nine states
+make && ./preview --anim /tmp/f 2 4    # 40 frames, style 2, pupil 4
+```
+
+The eye art is the part that needs iteration, and flashing a board to look at a
+4 px change is a bad loop. `docs/eye-styles.png` is the sheet; `docs/face.gif`
+is `--anim` piped through ffmpeg.
 
 ## Why the pieces are hand-written
 
@@ -180,7 +217,7 @@ export PICO_TOOLCHAIN_PATH=/path/to/xpack-arm-none-eabi-gcc
 
 ```
 src/
-  board.h              pin map, I2C address, baud rate
+  board.h              pin map, I2C address, baud rate, eye style
   main.c               boot screen, frame loop, FPS/update counter, hold banner
   eyes.h/.c            procedural eye engine (blink, saccade, drift, yawn, wink)
   mood.h/.c            mood state machine + per-mood eye parameters

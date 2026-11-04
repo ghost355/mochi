@@ -11,28 +11,48 @@
 const mood_params_t k_moods[MOOD_COUNT] = {
     [MOOD_IDLE] = {
         .name = "idle",
-        .eyes = { 1.00f, 1.00f, EYE_SHAPE_CAPSULE, 2200, 6500 },
-        .duration_ms  = 0,
+        .eyes = { .open_rest = 1.00f, .gaze_amp = 1.00f,
+                  .shape = EYE_SHAPE_CAPSULE, .blink_min_ms = 2200, .blink_max_ms = 6500,
+                  .brow_len = 76, .brow_lift = 3, .brow_tilt = 0 },
+        .duration_ms = 0,
     },
     [MOOD_CURIOUS] = {
         .name = "curious",
-        .eyes = { 1.12f, 1.60f, EYE_SHAPE_CAPSULE, 1500, 3000 },
-        .duration_ms  = 2500,
+        .eyes = { .open_rest = 1.12f, .gaze_amp = 1.60f,
+                  .shape = EYE_SHAPE_CAPSULE, .blink_min_ms = 1500, .blink_max_ms = 3000,
+                  .brow_len = 64, .brow_lift = 6, .brow_tilt = 0 },
+        .duration_ms = 2500,
     },
     [MOOD_HAPPY] = {
         .name = "happy",
-        .eyes = { 1.00f, 1.20f, EYE_SHAPE_HAPPY, 1200, 2600 },
-        .duration_ms  = 4000,
+        .eyes = { .open_rest = 1.00f, .gaze_amp = 1.20f,
+                  .shape = EYE_SHAPE_HAPPY, .blink_min_ms = 1200, .blink_max_ms = 2600,
+                  .brow_len = 76, .brow_lift = 4, .brow_tilt = 0 },
+        .duration_ms = 4000,
     },
     [MOOD_ANNOYED] = {
         .name = "annoyed",
-        .eyes = { 0.50f, 0.40f, EYE_SHAPE_CAPSULE, 900, 1800 },
-        .duration_ms  = 3000,
+        .eyes = { .open_rest = 1.00f, .gaze_amp = 0.40f,
+                  .shape = EYE_SHAPE_CAPSULE, .blink_min_ms = 900, .blink_max_ms = 1800,
+                  .lid_pct = 30, .lid_angle = 14,
+                  .brow_len = 80, .brow_lift = 1, .brow_tilt = 5 },
+        .duration_ms = 3000,
+    },
+    [MOOD_ANGRY] = {
+        .name = "angry",
+        .eyes = { .open_rest = 1.00f, .gaze_amp = 0.30f,
+                  .shape = EYE_SHAPE_CAPSULE, .blink_min_ms = 1100, .blink_max_ms = 2400,
+                  .lid_pct = 26, .lid_angle = 18,
+                  .brow_len = 84, .brow_lift = 0, .brow_tilt = 2, .brow_mono = 1 },
+        .duration_ms = 3500,
     },
     [MOOD_SLEEPY] = {
         .name = "sleepy",
-        .eyes = { 0.45f, 0.50f, EYE_SHAPE_CAPSULE, 4000, 9000 },
-        .duration_ms  = 0,
+        .eyes = { .open_rest = 1.00f, .gaze_amp = 0.50f,
+                  .shape = EYE_SHAPE_CAPSULE, .blink_min_ms = 4000, .blink_max_ms = 9000,
+                  .lid_pct = 48,
+                  .brow_len = 70, .brow_lift = 1, .brow_tilt = 3 },
+        .duration_ms = 0,
     },
 };
 
@@ -96,6 +116,13 @@ void mood_tap(uint32_t now_ms)
 void mood_hold(uint32_t now_ms)
 {
     s_last_touch = now_ms;
+}
+
+void mood_hold_long(uint32_t now_ms)
+{
+    s_last_touch = now_ms;
+    enter(MOOD_ANGRY, now_ms);
+    buzzer_play(&buzzer_sad);
 }
 
 void mood_release(uint32_t now_ms)

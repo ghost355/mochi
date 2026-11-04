@@ -19,3 +19,8 @@ cmake-build-*/
 # Raw captures (only the processed docs/ assets are tracked)
 *.MOV
 *.mov
+
+# preview renderer artifacts
+tools/preview/preview
+tools/preview/preview.ppm
+tools/preview/preview.png
