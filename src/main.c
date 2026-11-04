@@ -29,12 +29,15 @@
 #define FPS_TARGET   50
 #define BOOT_SCREEN_MS 2000
 
-// "РУКИ УБРАЛ!!!" banner, shown while the sensor stays touched past 5 s.
-#define WARN_TEXT      "РУКИ УБРАЛ!!!"
-#define WARN_Y         55
+// "РУКИ УБРАЛ!" banner. It sits on the top row, above the brows: the face owns
+// the middle of the screen and a bottom banner kept clipping the chin of the
+// eyes during a squint.
+#define WARN_TEXT      "РУКИ УБРАЛ!"
+#define WARN_Y         0
 #define WARN_SPACING   3
 #define WARN_AFTER_MS  2000
-#define WARN_PAGE      (WARN_Y / 8)
+#define WARN_PAGE      0            // rows 0..7
+#define WARN_LAST_ROW  6            // 5x7 font at y=0 ends here
 
 // --- Boot screen ----------------------------------------------------------
 
@@ -135,14 +138,16 @@ static void warn_render(void)
 
 static void warn_erase(void)
 {
-    for (int y = WARN_Y - 1; y < SH1106_HEIGHT; y++)
+    // Only the banner band: erasing to the bottom of the panel would wipe the
+    // eyes, which share page 0 by one row once the brows are up.
+    for (int y = WARN_Y; y <= WARN_LAST_ROW; y++)
         for (int x = 0; x < SH1106_WIDTH; x++)
             sh1106_set_pixel(x, y, false);
 }
 
 static void warn_flush(void)
 {
-    sh1106_flush_region(0, WARN_PAGE, SH1106_WIDTH, SH1106_PAGES - WARN_PAGE);
+    sh1106_flush_region(0, WARN_PAGE, SH1106_WIDTH, 1);
 }
 
 // --- Main -----------------------------------------------------------------
@@ -256,15 +261,11 @@ int main(void)
         if (r.w > 0 && r.h > 0) {
             int p0 = r.y / 8;
             int p1 = (r.y + r.h - 1) / 8;
+            // The eyes' rect starts below the banner, and the banner lives in
+            // the framebuffer, so any page-0 flush already carries it. Nothing
+            // to repaint here.
             sh1106_flush_region(r.x, p0, r.w, p1 - p0 + 1);
             updates++;
-
-            // The eyes never reach the banner band while squinting, but a frame
-            // in transition could, and the band would come out chewed up.
-            if (p1 >= WARN_PAGE && warn_shown) {
-                warn_render();
-                warn_flush();
-            }
         }
 
         // Held long enough: put the nag on screen. It is painted after the eyes

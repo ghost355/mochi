@@ -113,9 +113,10 @@ happy face still blinks correctly.
 the eyes wide, a press past 700 ms squints them and starts a drone, release
 blinks.
 
-Holding a finger on the sensor for 2 s paints `РУКИ УБРАЛ!!!` across the bottom
-of the screen — 117 px of the 128 available. It is painted after the eyes so it
-always wins, and erased the frame the hand comes off.
+Holding a finger on the sensor for 2 s paints `РУКИ УБРАЛ!` along the top row.
+It used to sit at the bottom, where it chewed into the chin of the eyes during
+a squint; the top row is free, since the brows start at row 10. Erased the
+frame the hand comes off.
 
 **Sound** (passive piezo on GP3, PWM slice, fully non-blocking): startup
 arpeggio, tap chirp, hold drone, release phrase, yawn, goodnight.

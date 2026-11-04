@@ -60,6 +60,9 @@ typedef struct {
     // its tilt in degrees, positive dropping the inner corner.
     int8_t         lid_pct;
     int8_t         lid_angle;
+    // Lower lid, percent of the eye it covers from the bottom. Both lids close
+    // on a sleepy face; the upper one alone reads as a squint, not as fatigue.
+    int8_t         lid_bottom_pct;
     // Brows. `brow_len` is the share of the eye width each brow spans, 0 = no
     // brow at all. `brow_lift` moves them up from the top of the eye,
     // `brow_tilt` drops the inner end (positive = angry), and `brow_mono`

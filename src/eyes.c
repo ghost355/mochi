@@ -428,6 +428,19 @@ static void apply_lid(int cx, int cy, int r, float t, int angle_deg)
     }
 }
 
+static void apply_lid_bottom(int cx, int cy, int r, float t)
+{
+    if (t <= 0.0f) return;
+
+    float s = (1.0f - 2.0f * t) * (float)r;   // line this far above the bottom
+
+    for (int y = -r; y <= r; y++) {
+        if ((float)y <= s) continue;
+        for (int x = -r; x <= r; x++)
+            sh1106_set_pixel(cx + x, cy + y, false);
+    }
+}
+
 // The chord where the lid meets the eyeball. Only the outlined eye needs it:
 // on a filled eye the white/black boundary already draws the lid.
 static void lid_chord(int cx, int cy, int r, float t, int angle_deg)
@@ -483,23 +496,34 @@ static void draw_eye_round(int cx, int cy, int eye, float open)
                : (s_cfg.pupil == PUPIL_BLOB)     ? BLOB_CORE_R
                : STAR_R;
 
-    // How far the lid comes down this frame: a blink and the mood's resting
-    // lid combine, whichever is lower wins.
+    // How far the lids close this frame: a blink and the mood's resting lid
+    // combine, whichever is lower wins.
     float t = 1.0f - open;
     float mood_t = (float)s_cfg.lid_pct / 100.0f;
     if (mood_t > t) t = mood_t;
+
+    float b = (float)s_cfg.lid_bottom_pct / 100.0f;
+    if (b > 0.45f) b = 0.45f;
 
     int max_x = clamp_int(r - base_r - thick - 1, 0, r);
     int max_y = clamp_int(r - base_r - thick - 1, 0, r);
     int px = clamp_int((int)(s_look_x * s_cfg.gaze_amp * STAR_PUPIL_GAIN), -max_x, max_x);
     int py = clamp_int((int)(s_look_y * s_cfg.gaze_amp * STAR_PUPIL_GAIN), -max_y, max_y);
 
-    // A heavy lid pushes the pupil down: a half-shut eye looks down, and the
-    // pupil would otherwise be sliced in half by its own eyelid.
-    if (t > 0.30f) {
-        int shift = (int)((t - 0.30f) * (float)r * 0.9f);
-        py += shift;
-        if (py > max_y) py = max_y;
+    // A closing lid carries the pupil with it: the pupil stays inside the
+    // sliver the lids leave open, otherwise it gets sliced into a black bite.
+    {
+        int y_top = (int)((2.0f * t - 1.0f) * (float)r);      // relative to cy
+        int y_bot = (int)((1.0f - 2.0f * b) * (float)r);
+
+        int lowest  = y_top + base_r + 1;
+        int highest = y_bot - base_r - 1;
+        if (lowest > highest) lowest = highest;
+
+        if (py < lowest)  py = lowest;
+        if (py > highest) py = highest;
+        if (py > max_y)   py = max_y;
+        if (py < -max_y)  py = -max_y;
     }
 
     switch (s_cfg.pupil) {
@@ -523,7 +547,12 @@ static void draw_eye_round(int cx, int cy, int eye, float open)
     // Mirror the tilt on the right eye, so an annoyed face is symmetric.
     int angle = (eye == 0) ? s_cfg.lid_angle : -s_cfg.lid_angle;
     apply_lid(cx, cy, r, t, angle);
-    if (!solid && t > 0.0f) lid_chord(cx, cy, r, t, angle);
+    apply_lid_bottom(cx, cy, r, b);
+
+    if (!solid) {
+        if (t > 0.0f) lid_chord(cx, cy, r, t, angle);
+        if (b > 0.0f) lid_chord(cx, cy, r, 1.0f - b, 0);
+    }
 }
 
 // One brow: a shallow arc, two pixels thick. The thickness is drawn as a
@@ -539,8 +568,6 @@ static void draw_brow(int x0, int y0, int x1, int y1)
         return;
     }
 
-    int prev_y = y0;
-
     for (int i = 0; i <= n; i++) {
         // Straight, not arched: a 1 px bow is invisible at this resolution but
         // it does eat into the thickness and makes the brow read as dashed.
@@ -548,14 +575,11 @@ static void draw_brow(int x0, int y0, int x1, int y1)
         int x = x0 + (dx * i) / n;
         int y = (int)lrintf((float)y0 + (float)(y1 - y0) * t);
 
-        // Bridge the step from the previous column, otherwise a tilted brow
-        // breaks into short dashes wherever it changes row.
-        int lo = y < prev_y ? y : prev_y;
-        int hi = (y < prev_y ? prev_y : y) + 1;
-        for (int yy = lo; yy <= hi; yy++)
-            sh1106_set_pixel(x, yy, true);
-
-        prev_y = y;
+        // Exactly two rows per column. Bridging the step as well would leave a
+        // one-pixel bump at every stair, which is what makes a two-pixel brow
+        // look like a thick bar with a thin line under it.
+        sh1106_set_pixel(x, y, true);
+        sh1106_set_pixel(x, y + 1, true);
     }
 }
 
@@ -567,12 +591,13 @@ static void draw_brows(int cx_l, int cx_r, int cy, int r)
     int top  = cy - r - s_cfg.brow_lift;
 
     if (s_cfg.brow_mono) {
-        // One line from the outer end of the left eye to the outer end of the
-        // right one; the middle rides over the bridge lower than the ends.
+        // One line across both eyes, dipping at the bridge: the outer ends sit
+        // high, the middle drops by `brow_tilt`. That V is the angry face —
+        // a flat monobrow reads as puzzled, not as furious.
         int x0 = cx_l - half, x1 = cx_r + half;
-        int y  = top + s_cfg.brow_tilt / 2;
-        draw_brow(x0, y, (cx_l + cx_r) / 2, y + s_cfg.brow_tilt);
-        draw_brow((cx_l + cx_r) / 2, y + s_cfg.brow_tilt, x1, y);
+        int mid = (cx_l + cx_r) / 2;
+        draw_brow(x0, top, mid, top + s_cfg.brow_tilt);
+        draw_brow(mid, top + s_cfg.brow_tilt, x1, top);
         return;
     }
 

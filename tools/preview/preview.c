@@ -95,6 +95,7 @@ typedef struct {
     bool          glance;
     int8_t        lid_pct;
     int8_t        lid_angle;
+    int8_t        lid_bottom_pct;
     int8_t        brow_len;
     int8_t        brow_lift;
     int8_t        brow_tilt;
@@ -113,10 +114,10 @@ static const shot_t k_shots[] = {
       .brow_len = 76, .brow_lift = 4, .brow_tilt = 0 },
     // 3: annoyed — tilted lids, brows pulled down
     { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
-      .lid_pct = 30, .lid_angle = 14, .brow_len = 80, .brow_lift = 1, .brow_tilt = 5 },
+      .lid_pct = 32, .lid_angle = 22, .brow_len = 80, .brow_lift = 3, .brow_tilt = 7 },
     // 4: angry — monobrow
     { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
-      .lid_pct = 26, .lid_angle = 18, .brow_len = 84, .brow_lift = 0, .brow_tilt = 2, .brow_mono = 1 },
+      .lid_pct = 34, .lid_angle = 28, .brow_len = 84, .brow_lift = 4, .brow_tilt = 12, .brow_mono = 1 },
     // 5: sleepy — half lid
     { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .lid_pct = 48, .brow_len = 70, .brow_lift = 1, .brow_tilt = 2 },
@@ -149,6 +150,7 @@ static void render_cell(int index, int ox, int oy)
     cfg.pupil       = s->pupil;
     cfg.lid_pct     = s->lid_pct;
     cfg.lid_angle   = s->lid_angle;
+    cfg.lid_bottom_pct = s->lid_bottom_pct;
     cfg.brow_len    = s->brow_len;
     cfg.brow_lift   = s->brow_lift;
     cfg.brow_tilt   = s->brow_tilt;
