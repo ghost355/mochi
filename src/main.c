@@ -44,6 +44,11 @@
 #define WARN_PAGE      0            // rows 0..7
 #define WARN_LAST_ROW  6            // 5x7 font at y=0 ends here
 
+// Three taps plus a held third one — the pomodoro gesture. It has to outrun the
+// squint (700 ms) and the grab (1500 ms), otherwise the timer would arrive with
+// the drone and the angry face still attached.
+#define FOCUS_HOLD_MS  500
+
 static int i2c_scan(i2c_inst_t *i2c)
 {
     int found = -1;
@@ -201,6 +206,8 @@ int main(void)
     int updates = 0;
     bool s_squinting = false;
     bool s_grabbed   = false;
+    bool s_focus_arm = false;       // the last tap was the third of a series
+    bool s_focus_gesture = false;   // ...and it is being held: this is the timer
     bool warn_shown = false;
     uint32_t last_held = 0;
     mood_t prev_mood = MOOD_IDLE;
@@ -226,28 +233,39 @@ int main(void)
             int taps = mood_tap(now);
             printf("touch: tap (%d)\n", taps);
 
-            // Three taps toggle the pomodoro. The mood machine already switched
-            // the face; the timer is the caller's.
-            if (taps == 3) {
-                if (focus_running()) {
-                    focus_stop();
-                    mood_focus_leave(now);
-                    focus_bar_clear();
-                    focus_bar_flush(0, SH1106_WIDTH);
-                    s_focus_px = -1;
-                    printf("focus: cancelled\n");
-                } else {
-                    focus_start(now);
-                    printf("focus: start 25 min\n");
-                }
+            // Arm the pomodoro gesture: three taps are just attention, but
+            // keeping the third one down starts or cancels the timer. Fast
+            // four-to-six tap series never arm it, because only the third tap
+            // of the window sets this flag.
+            s_focus_arm = (taps == 3);
+        }
+
+        if (ts.pressed && s_focus_arm && !s_focus_gesture &&
+            ts.held_ms >= FOCUS_HOLD_MS) {
+            s_focus_gesture = true;
+
+            if (focus_running()) {
+                focus_stop();
+                mood_focus_leave(now);
+                focus_bar_clear();
+                focus_bar_flush(0, SH1106_WIDTH);
+                s_focus_px = -1;
+                buzzer_play(&buzzer_sad);
+                printf("focus: cancelled\n");
+            } else {
+                focus_start(now);
+                mood_focus_enter(now);
+                buzzer_play(&buzzer_startup);
+                printf("focus: start 25 min\n");
             }
         }
-        if (ts.pressed && ts.held_ms >= 1500 && !s_grabbed) {
+
+        if (!s_focus_gesture && ts.pressed && ts.held_ms >= 1500 && !s_grabbed) {
             s_grabbed = true;
             mood_hold_long(now);
             printf("touch: grab %.1fs\n", (double)ts.held_ms / 1000.0);
         }
-        if (ts.pressed && ts.held_ms >= 700 && !s_squinting) {
+        if (!s_focus_gesture && ts.pressed && ts.held_ms >= 700 && !s_squinting) {
             s_squinting = true;
             eyes_set_squint(true);
             buzzer_tone(196, 600000);  // low drone until release
@@ -255,6 +273,8 @@ int main(void)
             printf("touch: hold\n");
         }
         if (ts.just_released) {
+            s_focus_arm = false;
+            s_focus_gesture = false;
             if (s_squinting) { s_squinting = false; eyes_set_squint(false); }
             s_grabbed = false;
             eyes_blink_now();
@@ -343,7 +363,7 @@ int main(void)
 
         // Held long enough: put the nag on screen. It is painted after the eyes
         // so it always wins, and erased the moment the hand comes off.
-        bool warn = ts.pressed && ts.held_ms >= WARN_AFTER_MS;
+        bool warn = ts.pressed && ts.held_ms >= WARN_AFTER_MS && !s_focus_gesture;
         if (warn != warn_shown) {
             warn_shown = warn;
             if (warn) {

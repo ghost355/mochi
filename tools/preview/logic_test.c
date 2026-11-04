@@ -61,10 +61,23 @@ int main(void)
     printf("gestures\n");
     expect("one tap",     taps(1000, 1),  MOOD_CURIOUS);
     expect("two taps",    taps(9000, 2),  MOOD_HAPPY);
-    expect("three taps",  taps(20000, 3), MOOD_FOCUS);
+    expect("three taps",  taps(20000, 3), MOOD_CURIOUS);
     expect("four taps",   taps(40000, 4), MOOD_ANNOYED);
     expect("five taps",   taps(60000, 5), MOOD_PLEADING);
     expect("six taps",    taps(80000, 6), MOOD_PANIC);
+
+    // The pomodoro is a held third tap, not a tap count, so no series may
+    // select the working face by itself — otherwise six taps to get panic
+    // would leave a 25-minute timer running behind the robot's back.
+    printf("tap series never arm the timer\n");
+    for (int n = 1; n <= 6; n++) {
+        mood_t m = taps(200000u + (uint32_t)n * 10000u, n);
+        if (m == MOOD_FOCUS) {
+            printf("  FAIL %d taps selected focus\n", n);
+            g_fail++;
+        }
+    }
+    if (!g_fail) printf("  ok\n");
 
     printf("timed moods fall back to idle\n");
     mood_init(100000);

@@ -147,9 +147,10 @@ int mood_tap(uint32_t now_ms)
         enter(MOOD_ANNOYED, now_ms);
         buzzer_play(&buzzer_sad);
     } else if (taps_in_window(now_ms, 2000) >= 3) {
-        // Handled by the caller: three taps start the focus timer, which owns
-        // the mood from here.
-        enter(MOOD_FOCUS, now_ms);
+        // Three taps on their own are just attention. The pomodoro needs the
+        // third tap to be held down, which is the caller's business; arming it
+        // here would let any fast four-to-six tap series start a timer.
+        enter(MOOD_CURIOUS, now_ms);
     } else if (taps_in_window(now_ms, 1200) >= 2) {
         enter(MOOD_HAPPY, now_ms);
     } else {

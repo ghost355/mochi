@@ -98,7 +98,7 @@ two pixels read as a hairline at this size, three read as a brow.
 | idle | default | neutral, blink every 2-6 s |
 | curious | one tap | wider eyes, fast gaze, 2.5 s |
 | happy | two taps within 1.2 s | eyes squeezed from below, brows high, 4 s |
-| focus | three taps within 2 s | lids low, brows pulled in — and a 25 min timer, see below |
+| focus | three taps, third one held 0.5 s | lids low, brows pulled in — and a 25 min timer, see below |
 | annoyed | four taps within 3 s | tilted lids, brows pulled down, 3 s |
 | pleading | five taps within 3 s | brows raised and pinched at the bridge, 4 s |
 | panic | six taps within 3.5 s | face scaled past the screen edge, pinprick pupils, gaze darting every 200 ms, 2.6 s |
@@ -140,9 +140,13 @@ ignored until the sequence ends.
   <img src="docs/boot.gif" width="340" alt="power-on sequence">
 </p>
 
-**Focus mode.** Three taps start a 25-minute pomodoro: the face goes serious,
-a progress bar crawls along the bottom three rows, and the robot stops falling
-asleep. Three taps again cancel it. When the timer runs out the bar clears, the
+**Focus mode.** Tap three times and keep the third tap down: at half a second the
+face goes serious, a progress bar crawls along the bottom three rows, and the
+robot stops falling asleep. The same gesture cancels it. Holding is what makes
+the gesture safe — the tap windows overlap, so a plain "three taps" rule would
+have been armed by the third tap of any four-to-six tap series, leaving a
+25-minute timer running behind a robot that was only being poked. Three taps on
+their own are now just attention. When the timer runs out the bar clears, the
 face celebrates and the arpeggio plays.
 
 **Sound** (passive piezo on GP3, PWM slice, fully non-blocking): boot arpeggio,
