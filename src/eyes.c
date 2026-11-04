@@ -47,7 +47,7 @@
 #define ASTERISK_R   4
 #define SCRIBBLE_R       6
 #define DOT_R            3
-#define BLOB_CORE_R      4
+#define BLOB_CORE_R      3
 #define STAR_GAP     8
 #define STAR_RING    2
 #define STAR_PUPIL_GAIN 1.3f
