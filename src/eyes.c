@@ -277,8 +277,11 @@ static void draw_scribble(int cx, int cy, int eye, int pct, bool on)
 static void draw_dot(int cx, int cy, int r, bool on);
 
 // A fat disc with short spikes: the pupil reads as a blob of ink with a few
-// bristles, not as a star. Cardinals get a longer tail than diagonals, and the
-// two eyes are offset by one step so they never look stamped from a symbol.
+// bristles, not as a star. The eight spokes are rotated off the axes, and by a
+// different angle per eye: a cross at 0/45 degrees looks printed, and a pair
+// of identical crosses looks stamped.
+static const float k_blob_rot[2] = { 21.0f, -27.0f };
+
 static void draw_blob(int cx, int cy, int eye, int pct, bool on)
 {
     int core = (BLOB_CORE_R * pct) / 100;
@@ -286,24 +289,20 @@ static void draw_blob(int cx, int cy, int eye, int pct, bool on)
 
     draw_dot(cx, cy, core, on);
 
-    static const int8_t dx[8] = { 0, 1, 1, 1, 0, -1, -1, -1 };
-    static const int8_t dy[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
+    if (pct < 70) return;          // the eyelid takes the spikes first
 
     for (int i = 0; i < 8; i++) {
-        int k = (i + eye) & 7;
-        bool cardinal = (dx[k] == 0 || dy[k] == 0);
+        float a = (k_blob_rot[eye] + 45.0f * (float)i) * (PI_F / 180.0f);
+        float ca = cosf(a);
+        float sa = sinf(a);
 
-        if (pct < 70) continue;        // the eyelid takes the tails first
-
-        if (cardinal) {
-            for (int r = core + 1; r <= core + 2; r++)
-                sh1106_set_pixel(cx + dx[k] * r, cy + dy[k] * r, on);
-        } else {
-            // A one-pixel stub on the diagonal only meets the disc at a corner,
-            // and a corner touch reads as a separate dot at this scale. Fill the
-            // notch instead: two pixels sharing an edge with the disc.
-            sh1106_set_pixel(cx + dx[k] * core, cy + dy[k] * (core - 1), on);
-            sh1106_set_pixel(cx + dx[k] * (core - 1), cy + dy[k] * core, on);
+        // Start one pixel inside the disc radius so every spoke is attached to
+        // the blob; the outer end is two pixels past it, the same reach the
+        // axial version had.
+        for (int r = core - 1; r <= core + 2; r++) {
+            int x = (int)lrintf(ca * (float)r);
+            int y = (int)lrintf(sa * (float)r);
+            sh1106_set_pixel(cx + x, cy + y, on);
         }
     }
 }
