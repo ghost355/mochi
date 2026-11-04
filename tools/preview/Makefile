@@ -16,8 +16,8 @@ SRC     := $(ROOT)/src
 # Pico SDK.
 INCS    := -Istub -I$(SRC)
 
-preview: preview.c $(SRC)/eyes.c
-	$(CC) $(CFLAGS) $(INCS) preview.c $(SRC)/eyes.c -o preview -lm
+preview: preview.c $(SRC)/eyes.c $(SRC)/display/font5x7.c
+	$(CC) $(CFLAGS) $(INCS) preview.c $(SRC)/eyes.c $(SRC)/display/font5x7.c -o preview -lm
 
 sheet: preview
 	./preview preview.ppm

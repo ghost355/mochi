@@ -59,6 +59,11 @@ buzzer (coil, tens of ohms) would need an NPN/MOSFET driver and a flyback diode.
 
 ![face](docs/face.gif)
 
+Every state the engine can wear, rendered by the engine itself on the host
+(`cd tools/preview && make sheet`):
+
+![every face](docs/eye-styles.png)
+
 - blink every 2-6 s (130 ms, smooth close/open curve, occasional double blink)
 - saccades: the gaze jumps to a new offset every 1-3 s and eases there in ~100 ms
 - slow vertical drift so the face never looks frozen
@@ -74,8 +79,8 @@ Two silhouettes, picked at build time in `src/board.h`:
 
 On the round styles the ring stays put and only the pupil travels, which costs
 a fraction of the bus time a moving eye does. `EYES_PUPIL` picks the pupil:
-`0` sparkle, `1` asterisk, `2` hand-drawn asterisk, `3` plain dot, `4` fat blob
-with short spikes poking out.
+`0` sparkle, `1` asterisk, `2` hand-drawn asterisk, `3` plain dot, `4` the
+default: a hand-authored 9x9 asterisk, a different mask on each eye.
 
 Expression is carried by two parameters rather than by swapping bitmaps: a
 **lid** (`lid_pct`, `lid_angle`) that closes the circle like an eyelid instead

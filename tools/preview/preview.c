@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "display/font5x7.h"
 #include "display/sh1106.h"
 #include "eyes.h"
 
@@ -50,7 +51,7 @@ static void rect(int x0, int y0, int w, int h, uint8_t r, uint8_t g, uint8_t b)
             px(x, y, r, g, b);
 }
 
-// 3x5 digits, so each cell can label itself.
+// 3x5 digits, kept for the debug dump.
 static const uint8_t digit3x5[10][5] = {
     { 0b111, 0b101, 0b101, 0b101, 0b111 },  // 0
     { 0b010, 0b110, 0b010, 0b010, 0b111 },  // 1
@@ -64,6 +65,7 @@ static const uint8_t digit3x5[10][5] = {
     { 0b111, 0b101, 0b111, 0b001, 0b111 },  // 9
 };
 
+__attribute__((unused))
 static void draw_number(int x, int y, int n, int scale)
 {
     char buf[8];
@@ -81,10 +83,14 @@ static void draw_number(int x, int y, int n, int scale)
 
 // --- Shots -----------------------------------------------------------------
 
+#define LABEL_SCALE 3
+#define LABEL_H     (FONT_CHAR_H * LABEL_SCALE + 8)
+
 #define CELL_W (SH1106_WIDTH * SCALE)
-#define CELL_H (SH1106_HEIGHT * SCALE)
+#define CELL_H (SH1106_HEIGHT * SCALE + LABEL_H)
 
 typedef struct {
+    const char   *label;
     eye_shape_t   shape;
     pupil_style_t pupil;
     float         open_rest;
@@ -105,40 +111,40 @@ typedef struct {
 
 static const shot_t k_shots[] = {
     // 0: idle — filled eyes, blob pupils, straight brows
-    { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
+    { .label = "IDLE", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .brow_len = 62, .brow_lift = 3, .brow_tilt = 0, .brow_thick = 3 },
     // 1: curious — wide eyes, brows up
-    { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.12f, .seed = 1, .t_ms = 300,
+    { .label = "CURIOUS", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.12f, .seed = 1, .t_ms = 300,
       .brow_len = 62, .brow_lift = 6, .brow_tilt = -1 },
     // 2: happy — brows level
-    { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
+    { .label = "HAPPY", .shape = EYE_SHAPE_HAPPY, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .brow_len = 60, .brow_lift = 4, .brow_tilt = 0, .brow_thick = 3 },
     // 3: annoyed — tilted lids, brows pulled down
-    { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
+    { .label = "ANNOYED", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .lid_pct = 32, .lid_angle = 22, .brow_len = 64, .brow_lift = 3, .brow_tilt = 6, .brow_thick = 3 },
     // 4: angry — monobrow
-    { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
+    { .label = "ANGRY", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .lid_pct = 34, .lid_angle = 28, .brow_len = 72, .brow_lift = 4, .brow_tilt = 10, .brow_thick = 3, .brow_mono = 1 },
     // 5: pleading — brows raised and pinched at the bridge
-    { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.10f, .seed = 1, .t_ms = 300,
+    { .label = "PLEADING", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.10f, .seed = 1, .t_ms = 300,
       .brow_len = 60, .brow_lift = 2, .brow_tilt = -4, .brow_thick = 3 },
     // 5b: sleepy — half lid
-    { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
+    { .label = "SLEEPY", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .lid_pct = 48, .brow_len = 70, .brow_lift = 1, .brow_tilt = 2 },
     // 6: idle, mid blink
-    { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
+    { .label = "BLINK", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .blink = true, .brow_len = 62, .brow_lift = 3, .brow_tilt = 0, .brow_thick = 3 },
     // 7: idle, looking left
-    { .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
+    { .label = "GLANCE", .shape = EYE_SHAPE_STAR_SOLID, .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .glance = true, .glance_x = -6.0f, .glance_y = 0.0f,
       .brow_len = 62, .brow_lift = 3, .brow_tilt = 0, .brow_thick = 3 },
     // 8: ring style, same face
-    { .shape = EYE_SHAPE_STAR_RING,  .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
+    { .label = "RING", .shape = EYE_SHAPE_STAR_RING,  .pupil = PUPIL_BLOB, .open_rest = 1.00f, .seed = 1, .t_ms = 300,
       .brow_len = 62, .brow_lift = 3, .brow_tilt = 0, .brow_thick = 3 },
 };
 
 #define N_SHOTS ((int)(sizeof(k_shots) / sizeof(k_shots[0])))
-#define COLS    3
+#define COLS    5
 
 static void render_cell(int index, int ox, int oy)
 {
@@ -186,8 +192,10 @@ static void render_cell(int index, int ox, int oy)
         }
     }
 
+    int eye_h = SH1106_HEIGHT * SCALE;
+
     rect(ox, oy, CELL_W, CELL_H, 0, 0, 0);
-    for (int y = 0; y < CELL_H; y++) {
+    for (int y = 0; y < eye_h; y++) {
         for (int x = 0; x < CELL_W; x++) {
             bool on = fb[y / SCALE][x / SCALE] != 0;
             // A little blue push so it reads as an OLED rather than paper.
@@ -196,8 +204,22 @@ static void render_cell(int index, int ox, int oy)
         }
     }
 
-    draw_number(ox + 4, oy + 4, index, 2);
+    // Caption band. The font draws through the same pixel sink as the eyes, so
+    // it is rendered into a cleared buffer and then blitted below the cell.
+    if (s->label) {
+        memset(fb, 0, sizeof(fb));
+        int tw = font_str_width(s->label, 1);
+        font_draw_str((SH1106_WIDTH - tw) / 2, 0, s->label, 1);
 
+        int base = oy + eye_h + 4;
+        for (int y = 0; y < FONT_CHAR_H; y++)
+            for (int x = 0; x < SH1106_WIDTH; x++)
+                if (fb[y][x])
+                    rect(ox + x * LABEL_SCALE, base + y * LABEL_SCALE,
+                         LABEL_SCALE, LABEL_SCALE, 210, 210, 210);
+    }
+
+    (void)index;
     for (int i = 0; i < BORDER; i++)
         ;
 }
