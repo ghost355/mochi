@@ -70,20 +70,32 @@ int main(void)
 
     uint32_t t = 0;
     int worst = 0;
+    int skipped = 0;
 
     // Run each face for a while, changing face every 40 frames, and watch how
     // far the simulated panel drifts from the framebuffer.
     for (int step = 0; step < 240; step++) {
-        if (step % 40 == 0) eyes_set_config(&k_face[(step / 40) % 3]);
+        bool switched = (step % 40 == 0);
+        if (switched) eyes_set_config(&k_face[(step / 40) % 3]);
 
         eyes_update(t);
-        flush(eyes_draw());
+        eyes_rect_t r = eyes_draw();
+
+        // A new face must be painted even when only the brows changed: the
+        // early-out that skips identical frames once compared geometry alone,
+        // so a mood that swapped the brows kept the previous pair on screen.
+        if (switched && step > 0 && r.w == 0) {
+            printf("step %d: config change produced no redraw\n", step);
+            skipped++;
+        }
+
+        flush(r);
 
         int bad = mismatches();
         if (bad > worst) worst = bad;
         t += 20;
     }
 
-    printf("worst mismatch: %d pixels\n", worst);
-    return worst == 0 ? 0 : 1;
+    printf("worst mismatch: %d pixels, skipped redraws: %d\n", worst, skipped);
+    return (worst == 0 && skipped == 0) ? 0 : 1;
 }

@@ -74,6 +74,12 @@ static float   s_look_x_t, s_look_y_t;  // target gaze offset
 static uint32_t s_next_saccade;
 
 static eyes_rect_t s_prev;
+
+// Everything that changes the drawing but not the geometry. The early-out
+// below compares only positions, so a mood that swaps the brows for a
+// different pair of brows would be skipped and the old ones would stay on the
+// panel — the face would keep wearing the previous expression.
+static uint32_t s_last_cfg_hash;
 static uint32_t    s_now;
 static int         s_last_h_l, s_last_h_r, s_last_cx, s_last_cy;
 static int         s_last_px, s_last_py;
@@ -821,6 +827,25 @@ void eyes_update(uint32_t now_ms)
     s_look_y += (s_look_y_t - s_look_y) * 0.35f;
 }
 
+static uint32_t cfg_hash(void)
+{
+    uint32_t h = 2166136261u;
+    #define MIX(v) (h = (h ^ (uint32_t)(v)) * 16777619u)
+    MIX(s_cfg.shape);
+    MIX(s_cfg.pupil);
+    MIX((int)(s_cfg.open_rest * 100.0f));
+    MIX(s_cfg.lid_pct);
+    MIX(s_cfg.lid_angle);
+    MIX(s_cfg.lid_bottom_pct);
+    MIX(s_cfg.brow_len);
+    MIX(s_cfg.brow_lift);
+    MIX(s_cfg.brow_tilt);
+    MIX(s_cfg.brow_thick);
+    MIX(s_cfg.brow_mono);
+    #undef MIX
+    return h;
+}
+
 eyes_rect_t eyes_draw(void)
 {
     eye_dims_t d = dims_for(s_cfg.shape);
@@ -866,7 +891,8 @@ eyes_rect_t eyes_draw(void)
         cx_l == s_last_cx && cy == s_last_cy &&
         pupil_x == s_last_px && pupil_y == s_last_py &&
         open_l_q == s_last_open_l && open_r_q == s_last_open_r &&
-        (int)s_cfg.shape == s_last_shape) {
+        (int)s_cfg.shape == s_last_shape &&
+        cfg_hash() == s_last_cfg_hash) {
         eyes_rect_t none = { 0, 0, 0, 0 };
         return none;
     }
@@ -928,6 +954,8 @@ eyes_rect_t eyes_draw(void)
 
     r.w = rx - r.x + 1;
     r.h = ry - r.y + 1;
+
+    s_last_cfg_hash = cfg_hash();
 
     s_prev = r;
     s_last_h_l = h_l;
